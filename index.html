@@ -14,7 +14,7 @@
         // Import the functions you need from the SDKs you need
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"; // MOD: Removed signInWithCustomToken
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot, setLogLevel as setFirestoreLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"; // MOD: Added onSnapshot
+        import { getFirestore, doc, setDoc, getDoc, setLogLevel as setFirestoreLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Your web app's Firebase configuration
         const firebaseConfig = {
@@ -28,6 +28,7 @@
         };
 
         let appId;
+        // MOD: Removed initialAuthToken declaration as it's no longer used with public config
 
         // Use global vars provided by the environment for appId
         try {
@@ -38,10 +39,10 @@
         }
 
 
-        // Initialize Firebase
+// ...
         let app, auth, db;
-        let linksDocRef = null; // Reference to the public document
-        let unsubscribeLinksListener = null; // For real-time updates
+        let currentUserId = null;
+        let linksDocRef = null;
 
         try {
             app = initializeApp(firebaseConfig);
@@ -49,134 +50,77 @@
             db = getFirestore(app);
             setFirestoreLogLevel('Debug');
 
-            // --- Define the PUBLIC Firestore doc reference ---
-            // START MOD: Changed path to public data
-            linksDocRef = doc(db, 'artifacts', appId, 'public/data/substitutionApp', 'savedLinks');
-            // END MOD
+            // ▼▼▼ จุดแก้ไขที่ 1: กำหนด path กลาง ที่นี่เลย! ▼▼▼
+            // เราสร้าง path ที่ไม่มี User ID แต่ใช้ appId เพื่อแยกข้อมูลระหว่างแอปได้
+            linksDocRef = doc(db, 'artifacts', appId, 'substitutionApp', 'sharedLinks'); // <-- ★ ลบ const ออก
+            // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
-            // --- Listener for real-time link updates ---
-            // START MOD: Added try...catch around onSnapshot
-            try {
-                unsubscribeLinksListener = onSnapshot(linksDocRef, (docSnap) => {
-                    const onetLinkInput = document.getElementById('onet-link-input');
-                    const teacherLinkInput = document.getElementById('teacher-link-input');
-                    const authStatus = document.getElementById('auth-status'); // Keep status update
-
-                    if (docSnap.exists()) {
-                        const data = docSnap.data();
-                        console.log("Received link update from Firestore:", data);
-                        onetLinkInput.value = data.onetUrl || '';
-                        teacherLinkInput.value = data.teacherUrl || '';
-
-                        // Only populate dates if the value actually changed and is not empty
-                        if (onetLinkInput.value && onetLinkInput.value !== (window.lastLoadedOnetUrl || '')) {
-                            console.log("Onet URL updated, populating dates...");
-                            onetLinkInput.dispatchEvent(new Event('blur')); // Trigger date loading
-                            window.lastLoadedOnetUrl = onetLinkInput.value; // Store last loaded URL
-                        } else if (!onetLinkInput.value) {
-                            // Clear dropdown if URL is removed
-                            const dateInput = document.getElementById('date-input');
-                            dateInput.innerHTML = '<option value="">กรุณาใส่ลิงก์ หรืออัปโหลดตารางติว O-NET</option>';
-                            dateInput.disabled = true;
-                            window.lastLoadedOnetUrl = '';
-                        }
-
-                    } else {
-                        console.log("Public links document does not exist yet.");
-                        // Clear inputs if the document is deleted
-                        onetLinkInput.value = '';
-                        teacherLinkInput.value = '';
-                        const dateInput = document.getElementById('date-input');
-                        dateInput.innerHTML = '<option value="">กรุณาใส่ลิงก์ หรืออัปโหลดตารางติว O-NET</option>';
-                        dateInput.disabled = true;
-                        window.lastLoadedOnetUrl = '';
-                    }
-                    // Update status regardless of document existence (indicates connection is live)
-                    if (authStatus) {
-                        authStatus.textContent = 'เชื่อมต่อฐานข้อมูลสาธารณะสำเร็จ';
-                        authStatus.classList.remove('text-red-500');
-                        authStatus.classList.add('text-green-600');
-                    }
-                }, (error) => { // Error callback for onSnapshot
-                    console.error("Error listening to public links (onSnapshot error):", error);
-                    const authStatus = document.getElementById('auth-status');
-                    if (authStatus) {
-                        // Display specific permission error
-                        if (error.code === 'permission-denied') {
-                             authStatus.textContent = 'ผิดพลาด: ไม่มีสิทธิ์อ่านข้อมูลลิงก์สาธารณะ';
-                        } else {
-                             authStatus.textContent = 'ผิดพลาด: ไม่สามารถเชื่อมต่อฐานข้อมูลสาธารณะ';
-                        }
-                        authStatus.classList.add('text-red-500');
-                        authStatus.classList.remove('text-green-600');
-                    }
-                });
-            } catch (snapshotError) { // Catch errors during the initial setup of onSnapshot
-                 console.error("Error setting up listener for public links:", snapshotError);
-                 const authStatus = document.getElementById('auth-status');
-                 if (authStatus) {
-                     // START MOD: Check for permission error during setup
-                     if (snapshotError.code === 'permission-denied') {
-                          authStatus.textContent = 'ผิดพลาด: ไม่มีสิทธิ์เริ่มฟังข้อมูลลิงก์สาธารณะ';
-                     } else {
-                          authStatus.textContent = 'ผิดพลาด: ไม่สามารถเริ่มฟังข้อมูลลิงก์สาธารณะ';
-                     }
-                     // END MOD
-                     authStatus.classList.add('text-red-500');
-                     authStatus.classList.remove('text-green-600');
-                 }
-            }
-            // END MOD
-
-
-            // --- Firebase Auth (still needed for anonymous access) ---
+            // --- Firebase Auth and Data Loading ---
             onAuthStateChanged(auth, async (user) => {
                 const saveButton = document.getElementById('save-links-button');
-                const authStatus = document.getElementById('auth-status'); // Re-select here
+                const onetLinkInput = document.getElementById('onet-link-input');
+                const teacherLinkInput = document.getElementById('teacher-link-input');
+                const authStatus = document.getElementById('auth-status');
 
                 if (user) {
-                    console.log("User is signed in anonymously or otherwise with UID:", user.uid);
-                    // No need to display UID for public data access
-                    saveButton.disabled = false; // Enable saving once authenticated (even anonymously)
-                     if (authStatus && !authStatus.textContent.includes('สาธารณะ') && !authStatus.textContent.includes('ผิดพลาด')) { // Avoid overwriting listener status or error messages
-                        authStatus.textContent = `เชื่อมต่อสำเร็จ (ผู้ใช้: ${user.isAnonymous ? 'ไม่ระบุตัวตน' : user.uid.substring(0,8)+'...' })`;
-                        authStatus.classList.remove('text-red-500');
-                        authStatus.classList.add('text-green-600');
+                    currentUserId = user.uid; // ยังเก็บ UID ไว้ดูสถานะได้ แต่ไม่ใช้ใน path แล้ว
+                    console.log("User is signed in anonymously with UID:", currentUserId);
+                    authStatus.textContent = `เชื่อมต่อฐานข้อมูลสำเร็จ (UID: ${currentUserId.substring(0, 8)}...)`;
+                    authStatus.classList.remove('text-red-500');
+                    authStatus.classList.add('text-green-600');
+                    
+                    // ★ จุดแก้ไขที่ 2: ไม่ต้องกำหนด linksDocRef ในนี้อีกต่อไป เพราะเราใช้ตัวแปรกลางที่สร้างไว้ด้านบน
+
+                    // Try to load saved links from the shared document
+                    try {
+                        const docSnap = await getDoc(linksDocRef); // ★ ใช้ linksDocRef กลาง
+                        if (docSnap.exists()) {
+                            const data = docSnap.data();
+                            console.log("Loaded SHARED links from Firestore:", data);
+                            onetLinkInput.value = data.onetUrl || '';
+                            teacherLinkInput.value = data.teacherUrl || '';
+                            if (onetLinkInput.value) {
+                                setTimeout(() => {
+                                    onetLinkInput.dispatchEvent(new Event('blur'));
+                                }, 0);
+                            }
+                        } else {
+                            console.log("No SHARED links document found.");
+                        }
+                    } catch (e) {
+                        console.error("Error loading shared links:", e);
                     }
+                    saveButton.disabled = false;
+
                 } else {
                     console.log("User is signed out.");
-                     if (authStatus) {
-                        authStatus.textContent = 'ยังไม่เชื่อมต่อฐานข้อมูล (กรุณารีเฟรช)';
-                        authStatus.classList.add('text-red-500');
-                        authStatus.classList.remove('text-green-600');
-                     }
+                    authStatus.textContent = 'ยังไม่เชื่อมต่อฐานข้อมูล (กรุณารีเฟรช)';
+                    authStatus.classList.add('text-red-500');
+                    authStatus.classList.remove('text-green-600');
+                    currentUserId = null;
+                    // linksDocRef ไม่ต้องเป็น null แล้ว เพราะเป็นค่าคงที่
                     saveButton.disabled = true;
                 }
             });
+            // ...
 
-            // Always sign in anonymously for public data access
-            console.log("Signing in anonymously for public data access...");
+            // START MOD: Always sign in anonymously when using public config
+            console.log("Using public config, signing in anonymously...");
             await signInAnonymously(auth);
-
+            // END MOD
 
         } catch (e) {
             console.error("Firebase Initialization Error:", e);
             const authStatus = document.getElementById('auth-status');
-            if(authStatus) {
-                 authStatus.textContent = 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้';
-                 authStatus.classList.add('text-red-500');
-                 authStatus.classList.remove('text-green-600');
-            }
+            if(authStatus) authStatus.textContent = 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้';
         }
 
-        // --- Save Links Logic (uses the public linksDocRef defined above) ---
+        // --- Save Links Logic ---
         window.saveLinks = async () => {
             const saveButton = document.getElementById('save-links-button');
             const authStatus = document.getElementById('auth-status');
             if (!linksDocRef) {
                 console.error("Firestore doc ref is not ready.");
-                 authStatus.textContent = 'ผิดพลาด: การเชื่อมต่อฐานข้อมูลยังไม่พร้อม';
-                 authStatus.classList.add('text-red-500');
                 return;
             }
 
@@ -187,35 +131,21 @@
             saveButton.textContent = 'กำลังบันทึก...';
             
             try {
-                // Save to the public document
                 await setDoc(linksDocRef, { 
                     onetUrl: onetUrl, 
                     teacherUrl: teacherUrl 
-                }, { merge: true }); // Use merge to avoid overwriting unrelated fields if any
-                console.log("Links saved to public Firestore document.");
-                authStatus.textContent = 'บันทึกลิงก์สาธารณะสำเร็จ!';
-                 authStatus.classList.remove('text-red-500'); // Ensure success message is green
-                 authStatus.classList.add('text-green-600');
+                });
+                console.log("Links saved to Firestore.");
+                authStatus.textContent = 'บันทึกลิงก์สำเร็จ!';
                 setTimeout(() => {
-                     // Status will be updated by the onSnapshot listener automatically if connection is live
-                     // If not live, reset to a neutral state or indicate connection status
-                     if (auth.currentUser && !authStatus.textContent.includes('ผิดพลาด')) {
-                         authStatus.textContent = 'เชื่อมต่อฐานข้อมูลสาธารณะสำเร็จ';
-                         authStatus.classList.add('text-green-600');
-                     }
+                    if (auth.currentUser) {
+                         authStatus.textContent = `เชื่อมต่อฐานข้อมูลสำเร็จ (UID: ${currentUserId.substring(0, 8)}...)`;
+                    }
                 }, 2000);
 
             } catch (e) {
-                console.error("Error saving public links:", e);
-                // START MOD: Provide specific error for permissions
-                if (e.code === 'permission-denied') {
-                     authStatus.textContent = 'บันทึกไม่สำเร็จ: ไม่มีสิทธิ์เขียนข้อมูลสาธารณะ';
-                } else {
-                     authStatus.textContent = 'บันทึกลิงก์สาธารณะไม่สำเร็จ';
-                }
-                authStatus.classList.add('text-red-500');
-                authStatus.classList.remove('text-green-600');
-                // END MOD
+                console.error("Error saving links:", e);
+                authStatus.textContent = 'บันทึกลิงก์ไม่สำเร็จ';
             } finally {
                 saveButton.disabled = false;
                 saveButton.textContent = 'บันทึกลิงก์';
