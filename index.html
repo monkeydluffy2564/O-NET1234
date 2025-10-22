@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>แอปจัดตารางสอนแทนอัจฉริยะ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <!-- START ADD: Firebase SDK -->
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"; // MOD: Removed signInWithCustomToken
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, setLogLevel as setFirestoreLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"; // MOD: Added onSnapshot
+
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+             apiKey: "AIzaSyAJsk4l8I8uCYpJY8jZLAlRW1w2qLWN-2o",
+             authDomain: "game24-69666.firebaseapp.com",
+             projectId: "game24-69666",
+             storageBucket: "game24-69666.firebasestorage.app",
+             messagingSenderId: "989271279576",
+             appId: "1:989271279576:web:43115bbaeeae31160954ad",
+             measurementId: "G-B1ZTE90SGG"
+        };
+
+        let appId;
+
+        // Use global vars provided by the environment for appId
+        try {
+            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        } catch (e) {
+            console.error("Failed to get appId:", e);
+            appId = 'default-app-id';
+        }
+
+
+        // Initialize Firebase
+        let app, auth, db;
+        let linksDocRef = null; // Reference to the public document
+        let unsubscribeLinksListener = null; // For real-time updates
+
+        try {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            setFirestoreLogLevel('Debug');
+
+            // --- Define the PUBLIC Firestore doc reference ---
+            // START MOD: Changed path to public data
+            linksDocRef = doc(db, 'artifacts', appId, 'public/data/substitutionApp', 'savedLinks');
+            // END MOD
+
+            // --- Listener for real-time link updates ---
+            // START MOD: Added try...catch around onSnapshot
+            try {
+                unsubscribeLinksListener = onSnapshot(linksDocRef, (docSnap) => {
+                    const onetLinkInput = document.getElementById('onet-link-input');
+                    const teacherLinkInput = document.getElementById('teacher-link-input');
+                    const authStatus = document.getElementById('auth-status'); // Keep status update
+
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        console.log("Received link update from Firestore:", data);
+                        onetLinkInput.value = data.onetUrl || '';
+                        teacherLinkInput.value = data.teacherUrl || '';
+
+                        // Only populate dates if the value actually changed and is not empty
+                        if (onetLinkInput.value && onetLinkInput.value !== (window.lastLoadedOnetUrl || '')) {
+                            console.log("Onet URL updated, populating dates...");
+                            onetLinkInput.dispatchEvent(new Event('blur')); // Trigger date loading
+                            window.lastLoadedOnetUrl = onetLinkInput.value; // Store last loaded URL
+                        } else if (!onetLinkInput.value) {
+                            // Clear dropdown if URL is removed
+                            const dateInput = document.getElementById('date-input');
+                            dateInput.innerHTML = '<option value="">กรุณาใส่ลิงก์ หรืออัปโหลดตารางติว O-NET</option>';
+                            dateInput.disabled = true;
+                            window.lastLoadedOnetUrl = '';
+                        }
+
+                    } else {
+                        console.log("Public links document does not exist yet.");
+                        // Clear inputs if the document is deleted
+                        onetLinkInput.value = '';
+                        teacherLinkInput.value = '';
+                        const dateInput = document.getElementById('date-input');
+                        dateInput.innerHTML = '<option value="">กรุณาใส่ลิงก์ หรืออัปโหลดตารางติว O-NET</option>';
+                        dateInput.disabled = true;
+                        window.lastLoadedOnetUrl = '';
+                    }
+                    // Update status regardless of document existence (indicates connection is live)
+                    if (authStatus) {
+                        authStatus.textContent = 'เชื่อมต่อฐานข้อมูลสาธารณะสำเร็จ';
+                        authStatus.classList.remove('text-red-500');
+                        authStatus.classList.add('text-green-600');
+                    }
+                }, (error) => { // Error callback for onSnapshot
+                    console.error("Error listening to public links (onSnapshot error):", error);
+                    const authStatus = document.getElementById('auth-status');
+                    if (authStatus) {
+                        // Display specific permission error
+                        if (error.code === 'permission-denied') {
+                             authStatus.textContent = 'ผิดพลาด: ไม่มีสิทธิ์อ่านข้อมูลลิงก์สาธารณะ';
+                        } else {
+                             authStatus.textContent = 'ผิดพลาด: ไม่สามารถเชื่อมต่อฐานข้อมูลสาธารณะ';
+                        }
+                        authStatus.classList.add('text-red-500');
+                        authStatus.classList.remove('text-green-600');
+                    }
+                });
+            } catch (snapshotError) { // Catch errors during the initial setup of onSnapshot
+                 console.error("Error setting up listener for public links:", snapshotError);
+                 const authStatus = document.getElementById('auth-status');
+                 if (authStatus) {
+                     // START MOD: Check for permission error during setup
+                     if (snapshotError.code === 'permission-denied') {
+                          authStatus.textContent = 'ผิดพลาด: ไม่มีสิทธิ์เริ่มฟังข้อมูลลิงก์สาธารณะ';
+                     } else {
+                          authStatus.textContent = 'ผิดพลาด: ไม่สามารถเริ่มฟังข้อมูลลิงก์สาธารณะ';
+                     }
+                     // END MOD
+                     authStatus.classList.add('text-red-500');
+                     authStatus.classList.remove('text-green-600');
+                 }
+            }
+            // END MOD
+
+
+            // --- Firebase Auth (still needed for anonymous access) ---
+            onAuthStateChanged(auth, async (user) => {
+                const saveButton = document.getElementById('save-links-button');
+                const authStatus = document.getElementById('auth-status'); // Re-select here
+
+                if (user) {
+                    console.log("User is signed in anonymously or otherwise with UID:", user.uid);
+                    // No need to display UID for public data access
+                    saveButton.disabled = false; // Enable saving once authenticated (even anonymously)
+                     if (authStatus && !authStatus.textContent.includes('สาธารณะ') && !authStatus.textContent.includes('ผิดพลาด')) { // Avoid overwriting listener status or error messages
+                        authStatus.textContent = `เชื่อมต่อสำเร็จ (ผู้ใช้: ${user.isAnonymous ? 'ไม่ระบุตัวตน' : user.uid.substring(0,8)+'...' })`;
+                        authStatus.classList.remove('text-red-500');
+                        authStatus.classList.add('text-green-600');
+                    }
+                } else {
+                    console.log("User is signed out.");
+                     if (authStatus) {
+                        authStatus.textContent = 'ยังไม่เชื่อมต่อฐานข้อมูล (กรุณารีเฟรช)';
+                        authStatus.classList.add('text-red-500');
+                        authStatus.classList.remove('text-green-600');
+                     }
+                    saveButton.disabled = true;
+                }
+            });
+
+            // Always sign in anonymously for public data access
+            console.log("Signing in anonymously for public data access...");
+            await signInAnonymously(auth);
+
+
+        } catch (e) {
+            console.error("Firebase Initialization Error:", e);
+            const authStatus = document.getElementById('auth-status');
+            if(authStatus) {
+                 authStatus.textContent = 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้';
+                 authStatus.classList.add('text-red-500');
+                 authStatus.classList.remove('text-green-600');
+            }
+        }
+
+        // --- Save Links Logic (uses the public linksDocRef defined above) ---
+        window.saveLinks = async () => {
+            const saveButton = document.getElementById('save-links-button');
+            const authStatus = document.getElementById('auth-status');
+            if (!linksDocRef) {
+                console.error("Firestore doc ref is not ready.");
+                 authStatus.textContent = 'ผิดพลาด: การเชื่อมต่อฐานข้อมูลยังไม่พร้อม';
+                 authStatus.classList.add('text-red-500');
+                return;
+            }
+
+            const onetUrl = document.getElementById('onet-link-input').value.trim();
+            const teacherUrl = document.getElementById('teacher-link-input').value.trim();
+
+            saveButton.disabled = true;
+            saveButton.textContent = 'กำลังบันทึก...';
+            
+            try {
+                // Save to the public document
+                await setDoc(linksDocRef, { 
+                    onetUrl: onetUrl, 
+                    teacherUrl: teacherUrl 
+                }, { merge: true }); // Use merge to avoid overwriting unrelated fields if any
+                console.log("Links saved to public Firestore document.");
+                authStatus.textContent = 'บันทึกลิงก์สาธารณะสำเร็จ!';
+                 authStatus.classList.remove('text-red-500'); // Ensure success message is green
+                 authStatus.classList.add('text-green-600');
+                setTimeout(() => {
+                     // Status will be updated by the onSnapshot listener automatically if connection is live
+                     // If not live, reset to a neutral state or indicate connection status
+                     if (auth.currentUser && !authStatus.textContent.includes('ผิดพลาด')) {
+                         authStatus.textContent = 'เชื่อมต่อฐานข้อมูลสาธารณะสำเร็จ';
+                         authStatus.classList.add('text-green-600');
+                     }
+                }, 2000);
+
+            } catch (e) {
+                console.error("Error saving public links:", e);
+                // START MOD: Provide specific error for permissions
+                if (e.code === 'permission-denied') {
+                     authStatus.textContent = 'บันทึกไม่สำเร็จ: ไม่มีสิทธิ์เขียนข้อมูลสาธารณะ';
+                } else {
+                     authStatus.textContent = 'บันทึกลิงก์สาธารณะไม่สำเร็จ';
+                }
+                authStatus.classList.add('text-red-500');
+                authStatus.classList.remove('text-green-600');
+                // END MOD
+            } finally {
+                saveButton.disabled = false;
+                saveButton.textContent = 'บันทึกลิงก์';
+            }
+        };
+
+        // Make functions globally available for inline/button clicks
+        window.triggerFileUpload = (inputId) => {
+            document.getElementById(inputId).click();
+        };
+
+    </script>
+    <!-- END ADD -->
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js`;
+    </script>
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+        }
+        /* ... (previous styles) ... */
+        .spinner {
+            border-top-color: #3498db;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        #results-output {
+            font-family: 'Sarabun', sans-serif;
+            font-size: 0.9rem; /* 14px */
+            line-height: 1.6;
+            white-space: normal; /* Allow wrapping */
+        }
+        .date-heading {
+            font-size: 1.25rem; /* 20px */
+            font-weight: 700;
+            color: #1f2937; /* gray-800 */
+            margin-bottom: 0.75rem; /* mb-3 */
+            border-bottom: 2px solid #e5e7eb; /* border-gray-200 */
+            padding-bottom: 0.5rem; /* pb-2 */
+        }
+        .teacher-heading {
+            font-size: 1.1rem; /* ~17px */
+            font-weight: 600;
+            color: #111827; /* gray-900 */
+            margin-top: 1rem; /* mt-4 */
+            margin-bottom: 0.5rem; /* mb-2 */
+        }
+        .substitution-line {
+            background-color: #fefce8; /* yellow-50 */
+            border: 1px solid #fde047; /* yellow-300 */
+            border-left-width: 4px;
+            border-left-color: #facc15; /* yellow-400 */
+            padding: 0.5rem 0.75rem; /* p-2 px-3 */
+            margin-bottom: 0.5rem; /* mb-2 */
+            border-radius: 0.375rem; /* rounded-md */
+        }
+        .no-substitution-line {
+            padding: 0.25rem 0.75rem; /* py-1 px-3 */
+            margin-bottom: 0.25rem; /* mb-1 */
+            color: #6b7280; /* gray-500 */
+        }
+        input:checked ~ .dot {
+            transform: translateX(1.5rem); /* 24px */
+        }
+        input:checked ~ .block {
+            background-color: #2563eb; /* blue-600 */
+        }
+        .show-subs-only .no-substitution-line {
+            display: none;
+        }
+        /* Style for hidden file input */
+        .hidden-file-input {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="container mx-auto max-w-4xl w-full">
+        <div class="bg-white rounded-2xl shadow-xl p-6 md:p-10">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-800">แอปจัดตารางสอนแทนอัจฉริยะ</h1>
+                <p class="text-gray-500 mt-2">ใส่ลิงก์ตาราง หรืออัปโหลดไฟล์ เพื่อให้ AI ช่วยวิเคราะห์</p>
+            </div>
+
+            <!-- START MOD: URL Input Section -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                <!-- O-NET Link -->
+                <div>
+                    <label for="onet-link-input" class="block mb-2 text-sm font-medium text-gray-700">ลิงก์ตารางติว O-NET (.txt, .pdf, Google Drive)</label>
+                    <div class="flex items-center">
+                        <input type="url" id="onet-link-input" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="https://...">
+                        <button onclick="triggerFileUpload('onet-schedule-upload')" class="ml-2 p-2.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg" title="Upload Fallback">
+                            <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        </button>
+                        <input id="onet-schedule-upload" type="file" class="hidden-file-input" accept=".pdf,.txt" />
+                    </div>
+                    <p id="onet-filename" class="text-sm text-gray-600 mt-1 truncate"></p>
+                </div>
+                <!-- Teacher Schedule Link -->
+                <div>
+                    <label for="teacher-link-input" class="block mb-2 text-sm font-medium text-gray-700">ลิงก์ตารางสอนปกติ (.txt, .pdf, Google Drive)</label>
+                    <div class="flex items-center">
+                        <input type="url" id="teacher-link-input" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="https://...">
+                         <button onclick="triggerFileUpload('teacher-schedule-upload')" class="ml-2 p-2.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg" title="Upload Fallback">
+                            <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        </button>
+                        <input id="teacher-schedule-upload" type="file" class="hidden-file-input" accept=".pdf,.txt" />
+                    </div>
+                    <p id="teacher-filename" class="text-sm text-gray-600 mt-1 truncate"></p>
+                </div>
+            </div>
+
+            <!-- Save Links Button & Status -->
+            <div class="flex justify-between items-center mb-6">
+                <button id="save-links-button" onclick="saveLinks()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition focus:outline-none focus:ring-4 focus:ring-green-300 disabled:bg-gray-400" disabled>
+                    บันทึกลิงก์
+                </button>
+                <span id="auth-status" class="text-sm text-gray-500">กำลังเชื่อมต่อฐานข้อมูล...</span>
+            </div>
+            <!-- END MOD -->
+
+
+            <!-- Date Input -->
+            <div class="mb-6">
+                 <label for="date-input" class="block mb-2 text-sm font-medium text-gray-700">เลือกวันที่ต้องการจัดตาราง</label>
+                 <select id="date-input" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 disabled:bg-gray-200 disabled:cursor-not-allowed" disabled>
+                    <option value="">กรุณาใส่ลิงก์ หรืออัปโหลดตารางติว O-NET</option>
+                 </select>
+            </div>
+
+            <!-- Action Button -->
+            <div class="text-center mb-6">
+                <button id="analyze-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center mx-auto">
+                    <svg id="button-icon" class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                    <div id="spinner" class="spinner w-5 h-5 rounded-full border-4 border-t-4 border-white mr-2 hidden"></div>
+                    <span id="button-text">วิเคราะห์และจัดตาราง</span>
+                </button>
+            </div>
+             <p id="error-message" class="text-center text-sm text-red-600 mt-2"></p>
+
+            <!-- Results Section (No changes here) -->
+            <div id="results-container" class="mt-8 p-6 bg-gray-50 rounded-lg border border-gray-200 hidden">
+                <div class="flex justify-between items-center mb-4 pb-4 border-b border-gray-200">
+                    <h2 class="text-2xl font-bold text-gray-800">ผลการจัดตารางสอนแทน</h2>
+                    <div class="flex items-center space-x-4">
+                        <button id="export-jpg-button" class="flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 transition disabled:text-gray-400 disabled:cursor-not-allowed">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            <span id="export-button-text">Export รูปภาพ</span>
+                        </button>
+                        <label for="toggle-details" class="flex items-center cursor-pointer">
+                            <span class="mr-3 text-sm font-medium text-gray-700">แสดงเฉพาะคาบที่สอนแทน</span>
+                            <div class="relative">
+                                <input type="checkbox" id="toggle-details" class="sr-only">
+                                <div class="block bg-gray-300 w-14 h-8 rounded-full transition"></div>
+                                <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition transform"></div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                <div id="results-output" class="text-gray-700 bg-white p-4 rounded-md shadow-inner text-sm leading-relaxed"></div>
+            </div>
+        </div>
+        <footer class="text-center mt-6 text-gray-500 text-sm">
+            <p>&copy; 2024 Smart Substitution App. Powered by Gemini.</p>
+        </footer>
+    </div>
+
+    <script type="module">
+        // This script tag is now a module to support Firebase imports.
+        // All non-module script content has been moved inside here or the Firebase module tag.
+        
+        // --- START: Policy and Constants (Simplified) ---
+        const teacherRoles = `
+        ครูติว: อมรเทพ(คณิต), ณัฐชนม์(วิทย์), ดำเนิน(ไทย), อรุณลักษณ์(อังกฤษ ป.6), สายรุ้ง(อังกฤษ ม.3)
+        ครูทั่วไป: เอกพจน์(ม.1-3), บรรจง(ป.4-ม.3), พจนาจ(ป.1-6), กฤษติยา(ป.4-ม.3), วิไลวรรณ(ป.1-6), กมลลักษณ์(ป.1-ม.3)
+        ครูเฉพาะ: วิภาวัลย์(ป.1), วิภารักษ์(ป.2), วิไลพร(ป.3), คีร่า(อังกฤษ ป.1-ม.3)
+        เงื่อนไขสอนแทนครูติว: อมรเทพ(ป.4-ม.3), ณัฐชนม์(ป.4-ม.3), ดำเนิน(ป.4-ม.3), อรุณลักษณ์(ป.1-ป.6), สายรุ้ง(ป.4-ม.3)
+        `;
+
+        const resultFormat = `
+        <div class="date-heading">YYYY/MM/DD</div>
+        <div class="teacher-heading">สอนแทน ครู[ชื่อครู] (ติดติว O-NET [วิชา] [ชั้น] เวลา [HH:MM-HH:MM น.]):</div>
+        <div class="substitution-line">- คาบ X: [ชั้น/วิชา] → <strong>ครู[ชื่อผู้สอนแทน]</strong> (เหตุผล: [ระบุเหตุผล])</div>
+        <div class="no-substitution-line">- คาบ X: ... → ไม่มีคาบที่ต้องสอนแทน (เหตุผล: [ระบุเหตุผล])</div>
+        `;
+        // --- END: Policy and Constants (Simplified) ---
+
+        // --- START: DOM Element References ---
+        // MOD: Updated IDs for file inputs
+        const onetScheduleInput = document.getElementById('onet-schedule-upload');
+        const teacherScheduleInput = document.getElementById('teacher-schedule-upload');
+        // NEW: Link inputs
+        const onetLinkInput = document.getElementById('onet-link-input');
+        const teacherLinkInput = document.getElementById('teacher-link-input');
+        
+        const dateInput = document.getElementById('date-input');
+        const analyzeButton = document.getElementById('analyze-button');
+        const resultsContainer = document.getElementById('results-container');
+        const resultsOutput = document.getElementById('results-output');
+        const onetFilename = document.getElementById('onet-filename');
+        const teacherFilename = document.getElementById('teacher-filename');
+        const errorMessage = document.getElementById('error-message');
+        const spinner = document.getElementById('spinner');
+        const buttonText = document.getElementById('button-text');
+        const buttonIcon = document.getElementById('button-icon');
+        const toggleDetailsInput = document.getElementById('toggle-details');
+        const exportJpgButton = document.getElementById('export-jpg-button');
+        const exportButtonText = document.getElementById('export-button-text');
+        // --- END: DOM Element References ---
+
+        // --- START: Date Helper Functions ---
+        function parseDateBE(dateStringBE) {
+            try {
+                const parts = dateStringBE.split('/');
+                if (parts.length !== 3) throw new Error('Invalid date format');
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
+                const beYear = parseInt(parts[2], 10);
+                const adYear = beYear - 543;
+                return new Date(Date.UTC(adYear, month, day));
+            } catch (e) {
+                console.error("Date parsing error:", e);
+                return null;
+            }
+        }
+
+        function formatFullThaiDate(date) {
+            if (!date) return "";
+            return date.toLocaleDateString('th-TH', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                numberingSystem: 'latn',
+                calendar: 'buddhist',
+                timeZone: 'UTC'
+            });
+        }
+        // --- END: Date Helper Functions ---
+
+        // --- START: File Handling and UI Update ---
+        // This function populates the date dropdown. It can be called by file upload or link input.
+        async function populateDateDropdown(textProvider) {
+            dateInput.innerHTML = '<option value="">กำลังโหลดวันที่...</option>';
+            dateInput.disabled = true;
+            
+            try {
+                const onetScheduleText = await textProvider();
+                const dateRegex = /(\d{2}\/\d{2}\/\d{4})/g;
+                const matches = onetScheduleText.match(dateRegex);
+                
+                if (matches && matches.length > 0) {
+                    const uniqueDates = [...new Set(matches)];
+                    const sortedDates = uniqueDates.sort((a, b) => {
+                        const dateA = parseDateBE(a);
+                        const dateB = parseDateBE(b);
+                        if (!dateA) return 1;
+                        if (!dateB) return -1;
+                        return dateA - dateB;
+                    });
+
+                    dateInput.innerHTML = ''; // Clear
+                    sortedDates.forEach(dateStr => {
+                        const option = document.createElement('option');
+                        option.value = dateStr;
+                        const dateObj = parseDateBE(dateStr);
+                        option.textContent = formatFullThaiDate(dateObj) || dateStr;
+                        dateInput.appendChild(option);
+                    });
+                    dateInput.disabled = false;
+                } else {
+                    dateInput.innerHTML = '<option value="">ไม่พบวันที่ในข้อมูล</option>';
+                    dateInput.disabled = true;
+                }
+            } catch (error) {
+                console.error("Error populating dates:", error);
+                errorMessage.textContent = 'ไม่สามารถดึงวันที่จากข้อมูลได้: ' + error.message;
+                dateInput.innerHTML = '<option value="">เกิดข้อผิดพลาด</option>';
+                dateInput.disabled = true;
+            }
+        }
+
+        // File upload event
+        onetScheduleInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                onetFilename.textContent = `ไฟล์ที่เลือก: ${file.name}`;
+                onetLinkInput.value = ''; // Clear link input
+                // Create a text provider function for the file
+                const textProvider = () => {
+                    const extractOnetText = file.type === 'application/pdf' ? extractTextFromPdfFile : extractTextFromTxtFile;
+                    return extractOnetText(file);
+                };
+                populateDateDropdown(textProvider);
+            }
+        });
+        
+        // Link input event (on blur, i.e., when user clicks away)
+        onetLinkInput.addEventListener('blur', () => {
+            const url = onetLinkInput.value.trim();
+            if (url) {
+                onetFilename.textContent = `ใช้ลิงก์: ${url.substring(0, 50)}...`;
+                onetScheduleInput.value = ''; // Clear file input
+                // Create a text provider function for the URL
+                const textProvider = () => fetchDataFromUrl(url);
+                populateDateDropdown(textProvider);
+            }
+        });
+
+        teacherScheduleInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                teacherFilename.textContent = `ไฟล์ที่เลือก: ${file.name}`;
+                teacherLinkInput.value = ''; // Clear link input
+            }
+        });
+
+        teacherLinkInput.addEventListener('blur', () => {
+             const url = teacherLinkInput.value.trim();
+            if (url) {
+                teacherFilename.textContent = `ใช้ลิงก์: ${url.substring(0, 50)}...`;
+                teacherScheduleInput.value = ''; // Clear file input
+            }
+        });
+        // --- END: File Handling and UI Update ---
+
+        // --- START: Toggle Visibility Logic ---
+        toggleDetailsInput.addEventListener('change', () => {
+            if (toggleDetailsInput.checked) {
+                resultsContainer.classList.add('show-subs-only');
+            } else {
+                resultsContainer.classList.remove('show-subs-only');
+            }
+        });
+        // --- END: Toggle Visibility Logic ---
+
+        // --- START: Export JPG Logic ---
+        exportJpgButton.addEventListener('click', () => {
+            const targetElement = document.getElementById('results-output');
+            const dateValue = dateInput.value.trim().replace(/\//g, '-') || 'schedule';
+            const filename = `ตารางสอนแทน-${dateValue}.jpg`;
+
+            if (!targetElement || targetElement.innerHTML.trim() === "") {
+                errorMessage.textContent = 'ไม่มีข้อมูลสำหรับ Export';
+                return;
+            }
+
+            exportJpgButton.disabled = true;
+            exportButtonText.textContent = 'กำลัง Export...';
+            errorMessage.textContent = ''; 
+
+            html2canvas(targetElement, {
+                scale: 2, 
+                useCORS: true,
+                backgroundColor: '#ffffff' // Ensure white background for JPG
+            }).then(canvas => {
+                const imageData = canvas.toDataURL('image/jpeg', 0.95); // Use JPEG format
+                const link = document.createElement('a');
+                link.href = imageData;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }).catch(err => {
+                console.error("Export Error:", err);
+                errorMessage.textContent = 'เกิดข้อผิดพลาดในการ Export รูปภาพ';
+            }).finally(() => {
+                exportJpgButton.disabled = false;
+                exportButtonText.textContent = 'Export รูปภาพ';
+            });
+        });
+        // --- END: Export JPG Logic ---
+
+        // --- START: Text Extraction Functions ---
+        
+        // NEW: Handles ArrayBuffer (from file OR fetch)
+        async function extractTextFromPdfData(arrayBuffer) {
+            try {
+                // START MOD: Added safety check for PDF header
+                const firstBytes = new Uint8Array(arrayBuffer.slice(0, 5));
+                const header = String.fromCharCode.apply(null, firstBytes);
+                if (!header.startsWith('%PDF-')) {
+                    console.warn("Data does not start with PDF header, attempting parse anyway...");
+                    // Optionally throw error immediately: throw new Error('Invalid PDF structure (header mismatch)');
+                }
+                // END MOD
+                
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                let textContent = '';
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const text = await page.getTextContent();
+                    textContent += text.items.map(s => s.str).join(' ');
+                }
+                return textContent;
+            } catch (error) {
+                console.error("PDF Parsing Error:", error);
+                // Propagate a clearer error message
+                throw new Error('ไม่สามารถอ่านข้อมูล PDF ได้: ' + (error.message || 'โครงสร้างไฟล์ไม่ถูกต้อง'));
+            }
+        }
+        
+        // MOD: Reads file into ArrayBuffer, then calls new function
+        async function extractTextFromPdfFile(file) {
+            const reader = new FileReader();
+            return new Promise((resolve, reject) => {
+                reader.onload = async (event) => {
+                    try {
+                        const text = await extractTextFromPdfData(event.target.result);
+                        resolve(text);
+                    } catch (error) {
+                        reject(error); // Reject with the error from extractTextFromPdfData
+                    }
+                };
+                reader.onerror = (error) => {
+                     console.error("File Reading Error (PDF):", error);
+                     reject('เกิดข้อผิดพลาดในการอ่านไฟล์ PDF: ' + (error.message || error));
+                }
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        async function extractTextFromTxtFile(file) {
+            const reader = new FileReader();
+            return new Promise((resolve, reject) => {
+                reader.onload = (event) => {
+                    resolve(event.target.result);
+                };
+                reader.onerror = (error) => {
+                    console.error("File Reading Error (TXT):", error);
+                    reject('เกิดข้อผิดพลาดในการอ่านไฟล์ TXT: ' + (error.message || error));
+                }
+                reader.readAsText(file, 'UTF-8');
+            });
+        }
+        
+        // --- START NEW: Data Fetching from URL ---
+        function getGoogleDriveDirectLink(url) {
+            try {
+                // Regex to find Google Drive file ID
+                const fileIdMatch = url.match(/d\/(.+?)\//);
+                if (fileIdMatch && fileIdMatch[1]) {
+                    const fileId = fileIdMatch[1];
+                    // Return direct download link
+                    return `https://docs.google.com/uc?export=download&id=${fileId}`;
+                }
+                 // Try another common GDrive format (sharing link)
+                const shareIdMatch = url.match(/id=([a-zA-Z0-9_-]+)/);
+                if (shareIdMatch && shareIdMatch[1]) {
+                    return `https://docs.google.com/uc?export=download&id=${shareIdMatch[1]}`;
+                }
+            } catch (e) {
+                console.warn("Could not parse Google Drive URL, using original.", e);
+            }
+            // If not a recognized GDrive link, return original URL
+            return url;
+        }
+
+        async function fetchDataFromUrl(url) {
+            if (!url) throw new Error("URL is empty");
+            console.log("Fetching data from URL:", url);
+
+            let fetchUrl = url;
+            if (url.includes('drive.google.com')) {
+                fetchUrl = getGoogleDriveDirectLink(url);
+                console.log("Transformed Google Drive URL to:", fetchUrl);
+            }
+
+            // Using a CORS proxy to bypass security restrictions
+            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(fetchUrl)}`;
+            let response;
+            
+            try {
+                response = await fetch(proxyUrl);
+                if (!response.ok) {
+                     // Try fetching directly if proxy fails (might work for some direct links)
+                     console.warn(`Proxy fetch failed (${response.status}), trying direct fetch...`);
+                     const directResponse = await fetch(fetchUrl);
+                     if (!directResponse.ok) {
+                         throw new Error(`Direct fetch also failed: ${directResponse.status} ${directResponse.statusText}`);
+                     }
+                     // Use direct response if successful
+                     response = directResponse; // Overwrite response with the successful one
+                }
+                 // Process the successful response (either from proxy or direct)
+                 return processResponse(response, url); // Removed fetchUrl as it's less reliable
+
+            } catch (error) {
+                console.error("FetchDataFromUrl Error:", error);
+                throw new Error(`ไม่สามารถดึงข้อมูลจากลิงก์ได้ (อาจเกิดปัญหา CORS หรือลิงก์ไม่ถูกต้อง): ${error.message}`);
+            }
+        }
+
+        // Helper function to process the fetch response
+        // START MOD: Added internal PDF check
+        async function processResponse(response, originalUrl) {
+            // Clone the response to read it twice (once for check, once for actual data)
+            const clonedResponse = response.clone();
+            const arrayBuffer = await response.arrayBuffer();
+
+            // Check first few bytes for PDF magic number
+            const firstBytes = new Uint8Array(arrayBuffer.slice(0, 5));
+            const header = String.fromCharCode.apply(null, firstBytes);
+
+            if (header.startsWith('%PDF-')) {
+                console.log("Treating as PDF based on content header...");
+                // Use the already fetched arrayBuffer
+                return await extractTextFromPdfData(arrayBuffer);
+            } else {
+                 console.log("Content doesn't start with PDF header, treating as TXT...");
+                 // Read the cloned response as text
+                 return await clonedResponse.text();
+            }
+        }
+        // END MOD
+        // --- END NEW: Data Fetching from URL ---
+        
+        // --- END: Text Extraction Functions ---
+
+        // --- START: UI State Management ---
+        function setUIState(isLoading, message = '') {
+            analyzeButton.disabled = isLoading;
+            errorMessage.textContent = message;
+            if (isLoading) {
+                spinner.classList.remove('hidden');
+                buttonIcon.classList.add('hidden');
+                buttonText.textContent = 'กำลังวิเคราะห์...';
+                resultsContainer.classList.add('hidden');
+            } else {
+                spinner.classList.add('hidden');
+                buttonIcon.classList.remove('hidden');
+                buttonText.textContent = 'วิเคราะห์และจัดตาราง';
+            }
+        }
+        // --- END: UI State Management ---
+
+        // --- START: Main Analysis Logic ---
+        analyzeButton.addEventListener('click', async () => {
+            setUIState(true);
+            resultsOutput.innerHTML = "";
+            
+            const dateStringForApi = dateInput.value.trim();
+            if (!dateStringForApi) {
+                setUIState(false, 'กรุณาเลือกวันที่');
+                return;
+            }
+
+            try {
+                // --- START NEW: Data Source Logic ---
+                let onetScheduleText;
+                let teacherScheduleText;
+
+                // 1. Get O-NET Data
+                const onetUrl = onetLinkInput.value.trim();
+                const onetFile = onetScheduleInput.files[0];
+                
+                if (onetUrl) {
+                    onetScheduleText = await fetchDataFromUrl(onetUrl);
+                } else if (onetFile) {
+                    const extractOnetText = onetFile.type === 'application/pdf' ? extractTextFromPdfFile : extractTextFromTxtFile;
+                    onetScheduleText = await extractOnetText(onetFile);
+                } else {
+                    throw new Error('กรุณาใส่ลิงก์ หรืออัปโหลดตารางติว O-NET');
+                }
+
+                // 2. Get Teacher Data
+                const teacherUrl = teacherLinkInput.value.trim();
+                const teacherFile = teacherScheduleInput.files[0];
+
+                if (teacherUrl) {
+                    teacherScheduleText = await fetchDataFromUrl(teacherUrl);
+                } else if (teacherFile) {
+                    const extractTeacherText = teacherFile.type === 'application/pdf' ? extractTextFromPdfFile : extractTextFromTxtFile;
+                    teacherScheduleText = await extractTeacherText(teacherFile);
+                } else {
+                    throw new Error('กรุณาใส่ลิงก์ หรืออัปโหลดตารางสอนปกติ');
+                }
+                // --- END NEW: Data Source Logic ---
+
+
+                // --- Date Formatting ---
+                const dateObj = parseDateBE(dateStringForApi);
+                if (!dateObj) {
+                    throw new Error("รูปแบบวันที่ไม่ถูกต้อง");
+                }
+                const fullThaiDate = formatFullThaiDate(dateObj);
+                    
+                // (THE PROMPT REMAINS UNCHANGED FROM THE PREVIOUS VERSION)
+                const finalPrompt = `
+                    คุณคือ AI จัดตารางสอนแทน วันที่ ${dateStringForApi} (ซึ่งคือ ${fullThaiDate}).
+
+                    **ข้อมูลสำคัญ:**
+                    ${teacherRoles}
+
+                    **เป้าหมาย:** สร้างตารางสอนแทนตามรูปแบบ HTML นี้เท่านั้น (ห้ามมี \`\`\`):
+                    <div class="date-heading">${fullThaiDate}</div>
+                    <div class="teacher-heading">สอนแทน ครู[ชื่อครู] (ติดติว O-NET [วิชา] [ชั้น] เวลา [HH:MM-HH:MM น.]):</div>
+                    <div class="substitution-line">- คาบ X: [ชั้น/วิชา] → <strong>ครู[ชื่อผู้สอนแทน]</strong> (เหตุผล: [ระบุเหตุผล])</div>
+                    <div class="no-substitution-line">- คาบ X: ... → ไม่มีคาบที่ต้องสอนแทน (เหตุผล: [ระบุเหตุผล])</div>
+
+                    **กระบวนการ (ทำตามเคร่งครัด):**
+                    1.  **หาครูติว 4 คน เวลาติว และชั้นที่ติว:** จากตารางติว, หาครู 4 คน, 'เวลาติวที่แน่นอน' (เช้า/บ่าย) และ 'ชั้นที่ติว' (ป.6/ม.3) ของวันที่ ${dateStringForApi}.
+                    
+                    2.  **หาคาบที่เกี่ยวข้อง (เฉพาะคาบที่ตรงเวลาติว):**
+                        * **กฎเหล็ก:** สำหรับครูที่ติวเช้า (08:30-11:30 น.), ให้วิเคราะห์ **เฉพาะคาบ 1, 2, 3** เท่านั้น. **ห้าม** วิเคราะห์หรือแสดงผลคาบ 4, 5, 6 ของครูคนนั้นเด็ดขาด.
+                        * **กฎเหล็ก:** สำหรับครูที่ติวบ่าย (12:30-15:30 น.), ให้วิเคราะห์ **เฉพาะคาบ 4, 5, 6** เท่านั้น. **ห้าม** วิเคราะห์หรือแสดงผลคาบ 1, 2, 3 ของครูคนนั้นเด็ดขาด.
+                        * **กฎยกเว้น (ห้ามจัดแทน):** ภายในคาบที่เกี่ยวข้อง (1-3 หรือ 4-6), ถ้าคาบนั้นเป็น **ป.6/ม.3** หรือกิจกรรม **ชุมนุม, ลูกเสือ, PLC**, ให้ระบุว่า "ไม่มีคาบที่ต้องสอนแทน (เหตุผล: คาบยกเว้น...)"
+                        * **กฎคาบว่าง:** ภายในคาบที่เกี่ยวข้อง (1-3 หรือ 4-6), ถ้าคาบนั้น **ไม่มีข้อความใดๆ หลังเครื่องหมาย :** (เป็นช่องว่าง), ให้ระบุว่า "ไม่มีคาบที่ต้องสอนแทน (เหตุผล: ครูมีคาบว่าง)"
+
+                    3.  **หาคนสอนแทน (ตามลำดับเคร่งครัด - เฉพาะคาบที่ไม่ถูกยกเว้น):**
+                        
+                        **!! กฎหลักในการค้นหา !!**
+                        **!! กฎเหล็กสูงสุด: ห้ามเลือกครูติว 4 คนที่กำลังติวในเวลานั้นๆ (เช่น ติวเช้า คาบ 1-3) มาเป็นผู้สอนแทนในคาบนั้นๆ เด็ดขาด ไม่ว่ากรณีใดๆ !!**
+
+                        * **นิยาม "ไม่ว่าง" (Busy):** ครูคนใดก็ตามที่...
+                            1.  มีสอนในคาบนั้น (วิชาที่ไม่ใช่ ป.6/ม.3 และไม่ใช่ช่องว่างเปล่า).
+                            2.  **หรือ** เป็นหนึ่งใน **'ครูติว'** 4 คนที่ต้องติว O-NET ใน **ช่วงเวลานั้นพอดี** (เช่น ติวเช้า คาบ 1-3).
+                        
+                        * **นิยาม "ว่าง-สลับคาบ" (Available-Swap):** ครูคนใดก็ตามที่...
+                            1.  **ไม่เข้าข่าย "ไม่ว่าง" (Busy)**
+                            2.  **และ** ตารางสอนปกติของครูในคาบนั้นเป็น **ป.6 หรือ ม.3** (ซึ่งนักเรียนไปติว).
+                            (ย้ำ: ต้องเป็นครูที่ "สอน" ป.6/ม.3 ในคาบนั้นจริงๆ ไม่ใช่ครูที่ "ว่าง" อยู่แล้ว)
+
+                        * **นิยาม "ว่าง-ตารางโล่ง" (Available-Empty):** ครูคนใดก็ตามที่...
+                            1.  **ไม่เข้าข่าย "ไม่ว่าง" (Busy)**
+                            2.  **และ** ตารางสอนปกติของครูในคาบนั้นเป็น **ช่องว่างเปล่า (ไม่มีข้อความหลัง :)** หรือมีข้อความว่า **"คาบว่าง"**.
+                            (ย้ำ: ต้องเป็นครูที่ "ว่าง" จริงๆ ในตาราง)
+                        
+                        **คำเตือน: ต้องทำตามลำดับ A -> B -> C -> D -> E -> F -> G -> H อย่างเคร่งครัด ห้ามข้ามลำดับ**
+
+                        * **ลำดับการหา:**
+                            **A. กฎเหล็ก (อันดับ 1 - ต้องตรวจสอบก่อนเสมอ):**
+                               **!! คำเตือน: นี่คือกฎสำคัญที่สุด ห้ามข้าม!!**
+                               1.  ตรวจสอบว่าคาบที่ต้องแทนเป็น ป.1, ป.2, หรือ ป.3 หรือไม่?
+                               2.  **ถ้าเป็น ป.1:** (บังคับทำ) ให้ตรวจสอบ 'ครูวิภาวัลย์' ก่อน. ถ้า 'ครูวิภาวัลย์' มีสถานะเป็น **"ว่าง-ตารางโล่ง"** ในคาบนั้น *ต้อง* ให้ครูวิภาวัลย์สอนแทน (เหตุผล: **กฎเฉพาะ ป.1**) และ **จบการค้นหา**. ถ้าไม่ว่าง (เช่น สอนอยู่ หรือเป็น Busy), ให้ไปทำต่อที่ข้อ B.
+                               3.  **ถ้าเป็น ป.2:** (บังคับทำ) ให้ตรวจสอบ 'ครูวิภารักษ์' ก่อน. ถ้า 'ครูวิภารักษ์' มีสถานะเป็น **"ว่าง-ตารางโล่ง"** ในคาบนั้น *ต้อง* ให้ครูวิภารักษ์สอนแทน (เหตุผล: **กฎเฉพาะ ป.2**) และ **จบการค้นหา**. ถ้าไม่ว่าง, ให้ไปทำต่อที่ข้อ B.
+                               4.  **ถ้าเป็น ป.3:** (บังคับทำ) ให้ตรวจสอบ 'ครูวิไลพร' ก่อน. ถ้า 'ครูวิไลพร' มีสถานะเป็น **"ว่าง-ตารางโล่ง"** ในคาบนั้น *ต้อง* ให้ครูวิไลพรสอนแทน (เหตุผล: **กฎเฉพาะ ป.3**) และ **จบการค้นหา**. ถ้าไม่ว่าง, ให้ไปทำต่อที่ข้อ B.
+                               5.  ถ้าไม่ใช่ ป.1-3, ให้ไปทำต่อที่ข้อ B.
+
+                            **B. กกฎสลับคาบ (ลำดับ 1 - ตรงชั้น):**
+                               ก. (ตรวจสอบต่อจาก A) **ระบุชั้นที่ครูติวกำลังติว** (เช่น ครูดำเนิน ติว **ม.3**).
+                               ข. **(บังคับทำ):** ให้ค้นหา 'ครู D' (ที่เป็น **'ครูทั่วไป'** และ**ไม่ใช่ครูติว**) ที่มีสถานะเป็น **"ว่าง-สลับคาบ"** **ซึ่งว่างเพราะสอนชั้นเดียวกับที่ครูติวกำลังติวพอดี** (เช่น ครูดำเนินติว **ม.3**, ก็ต้องหาครูที่ว่างเพราะสอน **ม.3**).
+                               ค. ถ้าเจอ 'ครู D' (ที่ว่างเพราะสอน ม.3) และเขาสอนคาบที่ต้องแทนได้ (เช่น สอน ม.2 ได้),
+                               ง. **(บังคับทำ):** *ต้อง* ให้ 'ครู D' สอนแทน (เหตุผล: **กฎสลับคาบ (นักเรียน ม.3 ติว)**) และ **จบการค้นหาสำหรับคาบนี้ทันที**.
+                               จ. ถ้าหาไม่เจอ (ไม่มีครูทั่วไปที่ว่างเพราะสอน ม.3), ให้ไปทำต่อที่ข้อ C.
+
+                            **C. กฎสลับคาบ (ลำดับ 2 - ข้ามชั้น):**
+                               ก. (ตรวจสอบต่อจาก B) **ระบุชั้นติวอีกระดับหนึ่ง** (เช่น ถ้าครูติวติว ม.3, ให้อีกระดับคือ **ป.6** / หรือถ้าติว ป.6, ให้อีกระดับคือ **ม.3**).
+                               ข. **(บังคับทำ):** ให้ค้นหา 'ครู E' (ที่เป็น **'ครูทั่วไป'** และ**ไม่ใช่ครูติว**) ที่มีสถานะเป็น **"ว่าง-สลับคาบ"** **ซึ่งว่างเพราะสอนชั้นอีกระดับนั้นพอดี** (เช่น ครูดำเนินติว ม.3, ให้หาครูที่ว่างเพราะสอน **ป.6**).
+                               ค. ถ้าเจอ 'ครู E' (ที่ว่างเพราะสอน ป.6) และเขาสอนคาบที่ต้องแทนได้,
+                               ง. **(บังคับทำ):** ให้ 'ครู E' สอนแทน (เหตุผล: **กฎสลับคาบ (นักเรียน ป.6 ติว)**) และ **จบการค้นหาสำหรับคาบนี้ทันที**.
+                               จ. ถ้าหาไม่เจอ (ไม่มีครูทั่วไปที่ว่างเพราะสอน ป.6), ให้ไปทำต่อที่ข้อ D.
+
+                            **D. กฎทั่วไป (ว่างเปล่า, ไม่เกิน 5 คาบ - อันดับ 4):**
+                               ก. (ตรวจสอบต่อจาก C) ให้หา 'ครูทั่วไป' ที่มีสถานะเป็น **"ว่าง-ตารางโล่ง"** (ตารางเป็นช่องว่าง) + สอนชั้นนั้นได้ + สอนรวมไม่เกิน 5 คาบ.
+                               ข. ถ้าเจอ (เช่น ครูเอกพจน์ คาบ 1), ให้สอนแทน (เหตุผล: **กฎทั่วไป - ครูว่าง**) และ **จบการค้นหา**. ถ้าไม่เจอ, ไป 'ลำดับ E'.
+
+                            **E. กฎอังกฤษ (ว่างเปล่า, ไม่เกิน 5 คาบ - อันดับ 5):**
+                               ก. (ตรวจสอบต่อจาก D) ถ้าเป็นวิชาอังกฤษ, หา 'ครูคีร่า' ที่มีสถานะเป็น **"ว่าง-ตารางโล่ง"** + สอนได้ + ไม่เกิน 5 คาบ.
+                               ข. ถ้าเจอ, ให้สอนแทน (เหตุผล: **กฎอังกฤษ - ครูว่าง**) และ **จบการค้นหา**. ถ้าไม่เจอ, ไป 'ลำดับ F'.
+
+                            **F. กฎทั่วไป (ว่างเปล่า, อนุโลม 6 คาบ - อันดับ 6):**
+                               ก. (ตรวจสอบต่อจาก E) กลับไปหา 'ครูทั่วไป' ที่มีสถานะเป็น **"ว่าง-ตารางโล่ง"** + สอนได้ (ยอมให้ครบ 6 คาบ).
+                               ข. ถ้าเจอ, ให้สอนแทน (เหตุผล: **กฎทั่วไป - ครูว่าง (อนุโลม)**) และ **จบการค้นหา**. ถ้าไม่เจอ, ไป 'ลำดับ G'.
+
+                            **G. กฎอังกฤษ (ว่างเปล่า, อนุโลม 6 คาบ - อันดับ 7):**
+                               ก. (ตรวจสอบต่อจาก F) ถ้าเป็นวิชาอังกฤษ, หา 'ครูคีร่า' ที่มีสถานะเป็น **"ว่าง-ตารางโล่ง"** + สอนได้, ยอมให้ครบ 6 คาบ.
+                               ข. ถ้าเจอ, ให้สอนแทน (เหตุผล: **กฎอังกฤษ - ครูว่าง (อนุโลม)**) และ **จบการค้นหา**. ถ้าไม่เจอ, ไป 'ลำดับ H'.
+
+                            **H. กฎสุดท้าย (ครูติว - อันดับ 8):**
+                               ก. (ตรวจสอบต่อจาก G) หา 'ครูติว O-NET' คนอื่น (ที่**ไม่ใช่**คนที่กำลังติวในเวลานั้น) ที่มีสถานะเป็น **"ว่าง-สลับคาบ" หรือ "ว่าง-ตารางโล่ง"** + สอนได้.
+                               ข. ถ้าเจอ, ให้สอนแทน (เหตุผล: **กฎครูติวว่าง**) และ **จบการค้นหา**. ถ้าไม่เจอ, ระบุว่า "หาผู้สอนแทนไม่ได้".
+
+                    4.  **สร้างผลลัพธ์:** แสดงผลครู 4 คนจากข้อ 1. ถ้าใครไม่มีคาบแทน (ตามข้อ 2), ให้ระบุ "- ไม่มีคาบที่ต้องสอนแทน (เหตุผล: ...)".
+
+                    --- ข้อมูลจากไฟล์ ---
+                    **ตารางติว O-NET:** ${onetScheduleText}
+                    **ตารางสอนปกติ:** ${teacherScheduleText}
+                    `;
+
+                const generatedText = await callGeminiAPI(finalPrompt);
+                
+                resultsOutput.innerHTML = generatedText; 
+                resultsContainer.classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Analysis Error:', error);
+                 if (error.message.includes("อ่านไฟล์ TXT")) {
+                     setUIState(false, `เกิดข้อผิดพลาดในการอ่านไฟล์ TXT: โปรดตรวจสอบว่าไฟล์เป็น UTF-8`);
+                 } else {
+                     setUIState(false, `เกิดข้อผิดพลาด: ${error.message}`);
+                 }
+            } finally {
+                 setUIState(false);
+            }
+        });
+        // --- END: Main Analysis Logic ---
+
+        // --- START: Gemini API Call ---
+        async function callGeminiAPI(prompt) {
+            // START MOD: Use public Gemini API key
+            const apiKey = "AIzaSyAUi4fu9J1iikYAiElQImErVreemVbUC9Q"; 
+            // END MOD
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: [{
+                    parts: [{ text: prompt }]
+                }],
+                generationConfig: {
+                    temperature: 0.0,
+                    maxOutputTokens: 8192, 
+                }
+            };
+            
+            let response;
+            let attempts = 0;
+            const maxAttempts = 5;
+            let delay = 1000;
+
+            while (attempts < maxAttempts) {
+                try {
+                    response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        const candidate = result.candidates?.[0];
+
+                        if (candidate && candidate.content?.parts?.[0]?.text) {
+                            return candidate.content.parts[0].text;
+                        } else {
+                            let errorText = "ไม่พบข้อมูลที่คาดหวังในคำตอบจาก AI";
+                            if (candidate?.finishReason) {
+                                errorText += ` (เหตุผลการสิ้นสุด: ${candidate.finishReason})`;
+                            }
+                            if (result.promptFeedback?.blockReason) {
+                                 errorText += ` (เหตุผลการบล็อก: ${result.promptFeedback.blockReason})`;
+                            }
+                            throw new Error(errorText);
+                        }
+                    } else if (response.status === 429) { // Throttling
+                        console.warn(`API rate limit hit. Retrying in ${delay / 1000}s...`);
+                        await new Promise(res => setTimeout(res, delay));
+                        delay *= 2; // Exponential backoff
+                        attempts++;
+                    } else {
+                        const errorResult = await response.json();
+                        throw new Error(errorResult.error ? errorResult.error.message : `HTTP error! status: ${response.status}`);
+                    }
+                } catch (error) {
+                    if(attempts >= maxAttempts -1){
+                        throw error; // Throw the error if max attempts reached
+                    }
+                    console.warn(`Fetch error. Retrying in ${delay / 1000}s...`, error);
+                    await new Promise(res => setTimeout(res, delay));
+                    delay *= 2; // Exponential backoff
+                    attempts++;
+                }
+            }
+
+            throw new Error("ไม่สามารถรับข้อมูลจาก AI ได้หลังจากพยายามหลายครั้ง");
+        }
+        // --- END: Gemini API Call ---
+
+    </script>
+</body>
+</html>
+
