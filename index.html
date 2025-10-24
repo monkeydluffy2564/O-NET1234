@@ -21,7 +21,7 @@
         /* Style the date picker icon */
         input[type="date"]::-webkit-calendar-picker-indicator {
             cursor: pointer;
-            filter: invert(0.6) sepia(0.5) saturate(5) hue-rotate(200deg); /* Adjust color to match theme */
+            filter: invert(0.6) sepia(0.5) saturate(5) hue-rotate(200deg);
         }
         /* Style for the buttons */
         .action-button {
@@ -60,13 +60,25 @@
         input[type="date"] {
              @apply w-auto max-w-xs p-3 border border-slate-300 rounded-lg text-lg text-center shadow-sm focus:ring-indigo-500 focus:border-indigo-500;
         }
-        /* Removed .export-fixed-width class */
+        /* Tab Styles */
+        .tab-button {
+            @apply px-4 py-2 text-lg font-medium border-b-2 border-transparent hover:border-indigo-500 hover:text-indigo-600 focus:outline-none transition duration-150 ease-in-out;
+        }
+        .tab-button.active {
+            @apply border-indigo-500 text-indigo-600;
+        }
+        .tab-content {
+            display: none; /* Hidden by default */
+        }
+        .tab-content.active {
+            display: block; /* Shown when active */
+        }
     </style>
 </head>
 <body class="bg-slate-100">
 
     <div class="min-h-screen p-4 md:p-8">
-        <!-- Main container with responsive max-width -->
+        <!-- Main container -->
         <div class="max-w-4xl mx-auto bg-white p-6 md:p-8 rounded-2xl shadow-lg">
             <h1 class="text-3xl font-bold text-center text-indigo-800 mb-6">
                 ระบบจัดตารางสอนแทน O-NET
@@ -81,25 +93,55 @@
                         type="date"
                         id="date-picker"
                         value="2025-11-10" <!-- Set default date -->
+                    >
                 </div>
             </div>
 
              <!-- Action Buttons -->
              <div class="flex flex-col sm:flex-row justify-center items-center space-y-3 sm:space-y-0 sm:space-x-4 mb-8">
                 <button id="export-btn" class="action-button export-button w-full sm:w-auto">
-                    <i class="fas fa-file-export mr-2"></i> Export ตารางสอน (JPG)
+                    <i class="fas fa-file-export mr-2"></i> Export ตารางเรียน (JPG)
                 </button>
                 <button id="share-btn" class="action-button share-button w-full sm:w-auto">
-                   <i class="fas fa-share-square mr-2"></i> แชร์รูปภาพ
+                   <i class="fas fa-share-square mr-2"></i> แชร์ตารางเรียน
                 </button>
             </div>
 
             <hr class="my-8" />
 
-            <!-- Schedule results container (remains responsive on screen) -->
-            <div id="schedule-results" class="space-y-6 bg-white p-1">
-                <!-- Results will be rendered here by JavaScript -->
+            <!-- Tabs -->
+            <div class="mb-4 border-b border-gray-200">
+                <nav class="-mb-px flex justify-center space-x-8" aria-label="Tabs">
+                    <button id="tab-teacher" class="tab-button active" data-tab="teacher-schedule">
+                        ตารางสอนแทน (สำหรับครู)
+                    </button>
+                    <button id="tab-student" class="tab-button" data-tab="student-schedule">
+                        ตารางเรียน (สำหรับนักเรียน)
+                    </button>
+                </nav>
             </div>
+
+            <!-- Tab Content Area -->
+            <div>
+                <!-- Teacher Schedule Content -->
+                <div id="teacher-schedule-content" class="tab-content active space-y-6 bg-white p-1">
+                    <h3 id="teacher-schedule-header" class="text-2xl font-bold text-center text-indigo-700 mb-6"></h3>
+                    <div id="teacher-schedule-details">
+                         <!-- Teacher details will be rendered here -->
+                    </div>
+                    <p id="teacher-schedule-nodata" class="text-center text-slate-500 text-xl font-medium py-8 hidden"></p>
+                </div>
+
+                <!-- Student Schedule Content -->
+                <div id="student-schedule-content" class="tab-content space-y-6 bg-white p-1">
+                   <h3 id="student-schedule-header" class="text-2xl font-bold text-center text-indigo-700 mb-6"></h3>
+                   <div id="student-schedule-details">
+                       <!-- Student schedule will be rendered here -->
+                   </div>
+                   <p id="student-schedule-nodata" class="text-center text-slate-500 text-xl font-medium py-8 hidden"></p>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -107,325 +149,326 @@
     <div id="toast">ข้อความแจ้งเตือน</div>
 
     <script>
-        // --- DATABASE: O-NET Schedule ---
+        // --- DATABASE: O-NET Schedule (Updated Times) ---
         const onetData = {
           "10/11/2568": [
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' }
           ],
           "11/11/2568": [
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 16:00 น.' }
           ],
-          "12/11/2568": [
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+           "12/11/2568": [
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' }
           ],
           "13/11/2568": [
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' }
           ],
           "14/11/2568": [
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' }
           ],
-          "17/11/2568": [
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+          // ... (Rest of the onetData remains the same) ...
+           "17/11/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 16:00 น.' }
           ],
           "18/11/2568": [
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' }
           ],
           "19/11/2568": [
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' }
           ],
           "20/11/2568": [
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' }
           ],
           "21/11/2568": [
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 16:00 น.' }
           ],
-          "24/11/2568": [
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+           "24/11/2568": [
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' }
           ],
           "25/11/2568": [
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' }
           ],
           "26/11/2568": [
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' }
           ],
           "27/11/2568": [
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 16:00 น.' }
           ],
           "28/11/2568": [
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' }
           ],
           "01/12/2568": [
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' }
           ],
           "02/12/2568": [
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' }
           ],
           "03/12/2568": [
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 16:00 น.' }
           ],
           "04/12/2568": [
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' }
           ],
           "08/12/2568": [
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' }
           ],
           "09/12/2568": [
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' }
           ],
-          "11/12/2568": [
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+           "11/12/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 16:00 น.' }
           ],
           "12/12/2568": [
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' }
           ],
           "15/12/2568": [
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' }
           ],
           "16/12/2568": [
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' }
           ],
           "17/12/2568": [
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 16:00 น.' }
           ],
           "18/12/2568": [
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' }
           ],
-          "19/12/2568": [
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+           "19/12/2568": [
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' }
           ],
           "22/12/2568": [
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' }
           ],
           "23/12/2568": [
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 16:00 น.' }
           ],
           "24/12/2568": [
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' }
           ],
           "25/12/2568": [
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' }
           ],
-          "29/12/2568": [
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+           "29/12/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' }
           ],
           "30/12/2568": [
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 16:00 น.' }
           ],
           "31/12/2568": [
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' }
           ],
           "06/01/2569": [
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' }
           ],
           "07/01/2569": [
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' }
           ],
-          "08/01/2569": [
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+           "08/01/2569": [
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 16:00 น.' }
           ],
           "09/01/2569": [
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' }
           ],
           "12/01/2569": [
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' }
           ],
           "13/01/2569": [
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' }
           ],
           "14/01/2569": [
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 16:00 น.' }
           ],
-          "15/01/2569": [
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+           "15/01/2569": [
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' }
           ],
           "16/01/2569": [
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' }
           ],
           "20/01/2569": [
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' }
           ],
           "21/01/2569": [
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 16:00 น.' }
           ],
           "22/01/2569": [
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' }
           ],
-          "23/01/2569": [
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+           "23/01/2569": [
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' }
           ],
           "26/01/2569": [
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' }
           ],
           "27/01/2569": [
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 16:00 น.' }
           ],
           "28/01/2569": [
-            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 16:00 น.' }
           ],
           "29/01/2569": [
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' }
           ],
           "30/01/2569": [
-            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
-            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
-            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:00 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' }
           ]
         };
 
@@ -483,7 +526,7 @@
           {
             name: 'ครูดำเนิน ว่าดี',
             type: 'tutor',
-            canTeachGrades: ['ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3'],
+            canTeachGrades: ['ป.6', 'ม.1', 'ม.2', 'ม.3'],
             canTeachSpecial: null,
             schedule: {
               'วันจันทร์': [
@@ -531,7 +574,7 @@
           {
             name: 'ครูอมรเทพ จันทร์ครบ',
             type: 'tutor',
-            canTeachGrades: ['ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3'],
+            canTeachGrades: ['ป.6', 'ม.1', 'ม.2', 'ม.3'],
             canTeachSpecial: null,
             schedule: {
               'วันจันทร์': [
@@ -579,7 +622,7 @@
           {
             name: 'ครูสายรุ้ง เรืองสุขสุด',
             type: 'tutor',
-            canTeachGrades: ['ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3'],
+            canTeachGrades: ['ป.5', 'ม.1', 'ม.2', 'ม.3'],
             canTeachSpecial: null,
             schedule: {
               'วันจันทร์': [
@@ -627,7 +670,7 @@
           {
             name: 'ครูอรุณลักษณ์ การกระสัง',
             type: 'tutor',
-            canTeachGrades: ['ป.1', 'ป.2', 'ป.3', 'ป.4', 'ป.5', 'ป.6'],
+            canTeachGrades: ['ป.1', 'ป.2', 'ป.4', 'ป.5', 'ป.6'],
             canTeachSpecial: null,
             schedule: {
               'วันจันทร์': [
@@ -869,7 +912,7 @@
           {
             name: 'ครูวิไลวรรณ ทองคำ',
             type: 'general',
-            canTeachGrades: ['ป.1', 'ป.2', 'ป.3', 'ป.4', 'ป.5', 'ป.6'],
+            canTeachGrades: ['ป.4', 'ป.5', 'ป.6'],
             canTeachSpecial: null,
             schedule: {
               'วันจันทร์': [
@@ -917,7 +960,7 @@
           {
             name: 'ครูบรรจง หวังทรัพย์',
             type: 'general',
-            canTeachGrades: ['ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3'],
+            canTeachGrades: ['ป.1', 'ป.2', 'ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3'],
             canTeachSpecial: null,
             schedule: {
               'วันจันทร์': [
@@ -965,7 +1008,7 @@
           {
             name: 'ครูเอกพจน์ หัวเขา',
             type: 'general',
-            canTeachGrades: ['ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3'],
+            canTeachGrades: ['ม.1', 'ม.2', 'ม.3'],
             canTeachSpecial: null,
             schedule: {
               'วันจันทร์': [
@@ -1112,6 +1155,11 @@
 
         const EXCLUDED_SUBJECTS = ['ลูกเสือ', 'ชุมนุม', 'PLC'];
         const TUTORING_GRADES = ['ป.6', 'ม.3'];
+        const PERIOD_TIMES = { // Define period start/end times if needed for display
+            1: "08:00 - 09:00", 2: "09:00 - 10:00", 3: "10:30 - 11:30",
+            4: "12:30 - 13:30", 5: "13:30 - 14:30", 6: "15:00 - 16:00"
+            // Adjust these times as per actual school schedule if different from O-NET blocks
+        };
 
         function formatDateToKey(dateString) {
           if (!dateString) return null;
@@ -1132,11 +1180,11 @@
 
         function canTeacherSubstitute(teacher, targetGrade, targetSubject) {
             if (!targetGrade) return true;
+            if (!targetSubject) return false; // Added check for null subject
 
             // Handle special subject teacher (e.g., English only)
             if (teacher.canTeachSpecial) {
                 const { subject, grades } = teacher.canTeachSpecial;
-                // Use includes for broader subject matching (e.g., "อังกฤษพื้นฐาน" includes "อังกฤษ")
                 if (targetSubject.toLowerCase().includes(subject.toLowerCase())) {
                     if (grades.includes(targetGrade)) {
                         return true;
@@ -1149,13 +1197,11 @@
                 return true;
             }
 
-            // If subject-specific and didn't match, or general and didn't match
             return false;
         }
 
 
         function isGradeTutoring(grade, period, onetDaySchedule) {
-          // Checks if a specific grade is in O-NET tutoring at a specific period
           if (!TUTORING_GRADES.includes(grade) || !onetDaySchedule) {
             return false;
           }
@@ -1168,7 +1214,6 @@
         }
 
         function isTeacherTutoring(teacherName, period, onetDaySchedule) {
-            // Checks if a specific teacher is busy tutoring O-NET at a specific period
             if (!onetDaySchedule) {
                 return false;
             }
@@ -1180,44 +1225,47 @@
             return false;
         }
 
-        // --- CORE SUBSTITUTION LOGIC ---
+        // --- CORE SUBSTITUTION LOGIC (returns both teacher and student schedules) ---
 
-        function generateSubstituteSchedule(dateKey) {
+        function generateSchedules(dateKey) {
             const onetDaySchedule = onetData[dateKey];
             const dayOfWeek = getDayOfWeek(dateKey);
 
+            const initialResult = {
+                teacherSchedule: [],
+                studentScheduleByGrade: {}, // { 'ป.1': [{period, subject, teacher}], ... }
+                fullDateText: '',
+                dayOfWeekText: dayOfWeek || ''
+            };
+
             if (!onetDaySchedule || !dayOfWeek) {
-                return { schedule: [], fullDateText: '', dayOfWeekText: dayOfWeek || '' }; // No O-NET on this day
+                return initialResult; // No O-NET on this day
             }
 
-             // Calculate fullDateText and dayOfWeekText here
             const [day, monthIndex, year] = dateKey.split('/');
-            const thaiMonths = [
-                'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-                'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
-            ];
-            const fullDateText = `วันที่ ${parseInt(day)} ${thaiMonths[parseInt(monthIndex) - 1]} ${year}`;
-            const dayOfWeekText = dayOfWeek;
+            const thaiMonths = [ /* ... month names ... */ 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+            initialResult.fullDateText = `วันที่ ${parseInt(day)} ${thaiMonths[parseInt(monthIndex) - 1]} ${year}`;
+            initialResult.dayOfWeekText = dayOfWeek;
 
-
-            // 1. Initialize teacher workloads
+            // 1. Initialize teacher workloads and track original schedule
             const teacherWorkloads = {};
+            const finalPeriodAssignments = {}; // { 1: { 'ป.1': { subject, teacher }, 'ป.2': {...} }, 2: {...} }
 
             allTeacherData.forEach(teacher => {
                 let baseWorkload = 0;
                 const normalSchedule = teacher.schedule[dayOfWeek];
                 if (normalSchedule) {
                     normalSchedule.forEach(cls => {
-                        // Count as workload if it's a real subject
+                        // Track original assignment
+                        if (!finalPeriodAssignments[cls.period]) finalPeriodAssignments[cls.period] = {};
+                        if(cls.grade && cls.subject && !EXCLUDED_SUBJECTS.includes(cls.subject)) {
+                             finalPeriodAssignments[cls.period][cls.grade] = { subject: cls.subject, teacher: teacher.name, originalTeacher: teacher.name };
+                        }
+
+                        // Calculate initial workload (excluding classes during own O-NET or where students are away)
                         if (cls.subject && !EXCLUDED_SUBJECTS.includes(cls.subject)) {
-                            // AND if the grade isn't away for O-NET tutoring at that time
-                            if (!isGradeTutoring(cls.grade, cls.period, onetDaySchedule)) {
-                                // *** CORRECTED LOGIC ***
-                                // AND if the teacher themself is NOT busy tutoring O-NET at this exact time
-                                // (If they are tutoring, this class is a "class to be covered" and not part of their base workload)
-                                if (!isTeacherTutoring(teacher.name, cls.period, onetDaySchedule)) {
-                                    baseWorkload++;
-                                }
+                            if (!isGradeTutoring(cls.grade, cls.period, onetDaySchedule) && !isTeacherTutoring(teacher.name, cls.period, onetDaySchedule)) {
+                                baseWorkload++;
                             }
                         }
                     });
@@ -1232,19 +1280,17 @@
                     const onetHours = session.periods.length;
                     teacherWorkloads[tutorName].onet = onetHours;
                     teacherWorkloads[tutorName].total += onetHours;
-                } else {
-                    console.warn(`O-NET tutor not found in teacher database: ${tutorName}`);
                 }
             });
 
             // 3. Find and assign substitutes
-            const finalSchedule = [];
-            const substitutionsMade = {}; // Tracks { period: [teacherName, ...], ... }
+            const teacherSubSchedule = []; // For the teacher tab
+            const substitutionsMade = {}; // Tracks { period: [assignedSubName, ...], ... }
 
             for (const session of onetDaySchedule) {
                 const tutorName = session.teacher;
                 const tutor = allTeacherData.find(t => t.name === tutorName);
-                const onetPeriods = session.periods; // e.g., [1, 2, 3]
+                const onetPeriods = session.periods;
 
                 if (!tutor) continue;
 
@@ -1256,254 +1302,336 @@
 
                 const tutorNormalSchedule = tutor.schedule[dayOfWeek];
 
-                // Find classes the tutor is missing *because* of O-NET
                 for (const classToCover of tutorNormalSchedule) {
                     const period = classToCover.period;
+                    const grade = classToCover.grade;
+                    const subject = classToCover.subject;
 
-                    // A. Must be a class during the O-NET session
-                    if (!onetPeriods.includes(period)) continue;
+                    if (!onetPeriods.includes(period) || !subject || EXCLUDED_SUBJECTS.includes(subject) || isGradeTutoring(grade, period, onetDaySchedule)) {
+                        // If the class is *not* covered (e.g., P.6 students are away), clear it from final assignments IF the original teacher was this tutor
+                        if (grade && finalPeriodAssignments[period]?.[grade]?.originalTeacher === tutorName) {
+                           // Keep the original teacher listed, but maybe mark it differently later if needed? For now, just don't find a sub.
+                           // OR delete finalPeriodAssignments[period][grade]; // If we decide to completely remove exempted classes
+                        }
+                        continue; // Skip finding sub if not needed
+                    }
 
-                    // B. Must be a real subject (not excluded)
-                    if (!classToCover.subject || EXCLUDED_SUBJECTS.includes(classToCover.subject)) continue;
 
-                    // C. Must not be a class where students are also at O-NET (auto-exempted)
-                    if (isGradeTutoring(classToCover.grade, period, onetDaySchedule)) continue;
-
-                    // --- Find a substitute for this specific class ---
+                    // --- Find Substitute ---
                     let candidates = [];
-                    for (const potentialSub of allTeacherData) {
-                        // 1. Can't substitute for themselves
-                        if (potentialSub.name === tutorName) continue;
+                    // (Candidate finding logic remains largely the same as before)
+                     for (const potentialSub of allTeacherData) {
+                        if (potentialSub.name === tutorName) continue; // Cannot sub self
 
-                        // 2. Check if the potential sub is TRULY vacant at this period
-                        const subSchedule = potentialSub.schedule[dayOfWeek].find(s => s.period === period);
-                        let isVacant = false;
+                        const subScheduleSlot = potentialSub.schedule[dayOfWeek].find(s => s.period === period);
+                        let isVacant = (!subScheduleSlot || !subScheduleSlot.subject || EXCLUDED_SUBJECTS.includes(subScheduleSlot.subject)) || isGradeTutoring(subScheduleSlot?.grade, period, onetDaySchedule);
 
-                        // 2a. Vacant if they have no class or an excluded class
-                        if (!subSchedule || !subSchedule.subject || EXCLUDED_SUBJECTS.includes(subSchedule.subject)) {
-                            isVacant = true;
-                        } 
-                        // 2b. Also vacant if their normal class's students (P.6/M.3) are at O-NET
-                        else if (isGradeTutoring(subSchedule.grade, period, onetDaySchedule)) {
-                             isVacant = true;
-                        }
-
-                        // 2c. BUT, they are NOT vacant if they are *also* an O-NET tutor and tutoring *this* period
-                        if (isTeacherTutoring(potentialSub.name, period, onetDaySchedule)) {
-                            isVacant = false; // Overrule: They are busy tutoring O-NET
-                        }
-
-                        // 2d. NOT vacant if they have *already* been assigned a sub class this period
-                        if (substitutionsMade[period] && substitutionsMade[period].includes(potentialSub.name)) {
+                        if (isTeacherTutoring(potentialSub.name, period, onetDaySchedule) || (substitutionsMade[period] && substitutionsMade[period].includes(potentialSub.name))) {
                             isVacant = false;
                         }
 
-                        // 3. If not vacant, skip them
-                        if (!isVacant) continue;
-
-                        // 4. Check if they are qualified to teach this class
-                        if (!canTeacherSubstitute(potentialSub, classToCover.grade, classToCover.subject)) {
-                            continue;
+                        if (isVacant && canTeacherSubstitute(potentialSub, grade, subject)) {
+                            candidates.push({ name: potentialSub.name, currentWorkload: teacherWorkloads[potentialSub.name].total });
                         }
-
-                        // 5. If all checks pass, they are a candidate
-                        candidates.push({
-                            name: potentialSub.name,
-                            currentWorkload: teacherWorkloads[potentialSub.name].total
-                        });
                     }
 
-                    // --- Assign the best candidate ---
+                    // --- Assign Substitute ---
                     if (candidates.length > 0) {
-                        // Sort by lowest workload first
                         candidates.sort((a, b) => a.currentWorkload - b.currentWorkload);
-                        
                         const bestSubName = candidates[0].name;
                         const newWorkload = candidates[0].currentWorkload + 1;
 
                         scheduleEntry.substitutions.push({
                             period: period,
-                            classInfo: `${classToCover.grade || 'ไม่ระบุ'}/${classToCover.subject}`,
+                            classInfo: `${grade || 'ไม่ระบุ'}/${subject}`,
                             subTeacher: bestSubName,
                             reason: `ครูว่าง (คาบรวมน้อยสุด), คาบรวม=${newWorkload}`
                         });
 
-                        // Update workload and mark as assigned
+                        // Update workload and track assignment
                         teacherWorkloads[bestSubName].sub++;
                         teacherWorkloads[bestSubName].total++;
-
-                        if (!substitutionsMade[period]) {
-                            substitutionsMade[period] = [];
-                        }
+                        if (!substitutionsMade[period]) substitutionsMade[period] = [];
                         substitutionsMade[period].push(bestSubName);
 
+                        // Update the final assignment for the student schedule
+                        if (grade && finalPeriodAssignments[period]?.[grade]?.originalTeacher === tutorName) {
+                            finalPeriodAssignments[period][grade].teacher = bestSubName; // Update teacher
+                        } else if (grade) {
+                            // This handles cases where the slot might have been empty initially but needs a sub (less likely with current logic but safe)
+                             if(!finalPeriodAssignments[period]) finalPeriodAssignments[period] = {};
+                             if(!finalPeriodAssignments[period][grade]) { // If the slot didn't exist (e.g., tutor had a free period, but it needs covering?) - This case needs re-evaluation based on exact rules. Assuming it was the tutor's class.
+                                 console.warn(`Assigning sub to potentially non-existent original slot for period ${period}, grade ${grade}. Tutor: ${tutorName}`);
+                                 finalPeriodAssignments[period][grade] = { subject: subject, teacher: bestSubName, originalTeacher: tutorName }; // Assume original was tutor
+                             } else {
+                                 console.warn(`Mismatch in finalPeriodAssignments originalTeacher for period ${period}, grade ${grade}. Tutor: ${tutorName}, Original found: ${finalPeriodAssignments[period]?.[grade]?.originalTeacher}`);
+                                 finalPeriodAssignments[period][grade].teacher = bestSubName; // Overwrite anyway?
+                             }
+                        }
+
                     } else {
-                        // No candidates found
                         scheduleEntry.substitutions.push({
                             period: period,
-                            classInfo: `${classToCover.grade || 'ไม่ระบุ'}/${classToCover.subject}`,
+                            classInfo: `${grade || 'ไม่ระบุ'}/${subject}`,
                             subTeacher: null,
                             reason: 'หาคนสอนแทนไม่ได้'
                         });
+                         // No sub found, mark as no teacher in student schedule
+                        if (grade && finalPeriodAssignments[period]?.[grade]?.originalTeacher === tutorName) {
+                           finalPeriodAssignments[period][grade].teacher = null; // Mark teacher as null
+                        }
                     }
-                }
+                } // End loop through tutor's classes
 
-                // Only add to final schedule if there was at least one class to cover
                 if (scheduleEntry.substitutions.length > 0) {
-                    finalSchedule.push(scheduleEntry);
+                    teacherSubSchedule.push(scheduleEntry);
                 }
-            }
+            } // End loop through O-NET sessions
 
-             return { schedule: finalSchedule, fullDateText, dayOfWeekText };
+            // 4. Build Student Schedule from finalPeriodAssignments
+            const studentScheduleByGrade = {};
+            const allGrades = ['ป.1', 'ป.2', 'ป.3', 'ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3']; // Define all possible grades
+
+            allGrades.forEach(grade => {
+                studentScheduleByGrade[grade] = []; // Initialize empty array for each grade
+                 for (let period = 1; period <= 6; period++) {
+                     const assignment = finalPeriodAssignments[period]?.[grade];
+                     if (assignment) { // Check if there's an assignment for this grade and period
+                        // Determine if it's a substitute
+                        const isSubstitute = assignment.teacher !== assignment.originalTeacher && assignment.teacher !== null;
+
+                         // Add to the schedule
+                         studentScheduleByGrade[grade].push({
+                             period: period,
+                             subject: assignment.subject,
+                             teacher: assignment.teacher, // Could be null if no sub found
+                             isSubstitute: isSubstitute
+                         });
+                     } else {
+                         // Add an entry for empty slots if desired, or skip
+                         // studentScheduleByGrade[grade].push({ period: period, subject: '---', teacher: '---', isSubstitute: false });
+                     }
+                 }
+                 // Sort by period just in case
+                 studentScheduleByGrade[grade].sort((a, b) => a.period - b.period);
+            });
+
+
+            return { teacherSchedule: teacherSubSchedule, studentScheduleByGrade, fullDateText: initialResult.fullDateText, dayOfWeekText: initialResult.dayOfWeekText };
         }
 
-        // --- UI Rendering ---
 
+        // --- UI Rendering ---
         const datePicker = document.getElementById('date-picker');
-        const resultsDiv = document.getElementById('schedule-results');
+        // Tab elements
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
+        const teacherScheduleContent = document.getElementById('teacher-schedule-content');
+        const studentScheduleContent = document.getElementById('student-schedule-content');
+        const teacherScheduleDetails = document.getElementById('teacher-schedule-details');
+        const studentScheduleDetails = document.getElementById('student-schedule-details');
+        const teacherHeaderEl = document.getElementById('teacher-schedule-header');
+        const studentHeaderEl = document.getElementById('student-schedule-header');
+        const teacherNoDataEl = document.getElementById('teacher-schedule-nodata');
+        const studentNoDataEl = document.getElementById('student-schedule-nodata');
+        // Action buttons & Toast
         const exportBtn = document.getElementById('export-btn');
         const shareBtn = document.getElementById('share-btn');
         const toast = document.getElementById('toast');
         let toastTimeout;
-
+        let currentFullSchedule = null; // Store the generated schedule
 
         function showToast(message) {
             toast.textContent = message;
             toast.classList.add('show');
-            clearTimeout(toastTimeout); // Clear previous timeout if any
+            clearTimeout(toastTimeout);
             toastTimeout = setTimeout(() => {
                 toast.classList.remove('show');
-            }, 3000); // Hide after 3 seconds
+            }, 3000);
         }
 
-        function renderSchedule() {
-            const selectedDateValue = datePicker.value;
-            const dateKey = formatDateToKey(selectedDateValue);
-            const { schedule, fullDateText, dayOfWeekText } = generateSubstituteSchedule(dateKey);
-
-            resultsDiv.innerHTML = ''; // Clear previous results
-
-            // Create and append header for schedule results
-            const header = document.createElement('h3');
-            header.className = "text-2xl font-bold text-center text-indigo-700 mb-6";
-            header.innerHTML = `📆 ผลการจัดตารางสอนแทน ${dayOfWeekText} ${fullDateText}`;
+        // Function to render the TEACHER substitution details
+        function renderTeacherSchedule(scheduleData) {
+             teacherScheduleDetails.innerHTML = '';
+             teacherNoDataEl.classList.add('hidden');
+             teacherHeaderEl.innerHTML = `📆 ผลการจัดตารางสอนแทน ${scheduleData.dayOfWeekText} ${scheduleData.fullDateText}`;
 
 
-            if (schedule.length > 0) {
-                resultsDiv.appendChild(header); // Append header only if there are results
-
-                // Create schedule entries
-                schedule.forEach(tutorEntry => {
+            if (scheduleData.teacherSchedule.length > 0) {
+                scheduleData.teacherSchedule.forEach(tutorEntry => {
                     const entryDiv = document.createElement('div');
                     entryDiv.className = "bg-slate-50 p-5 rounded-lg shadow-md border border-slate-200";
-
-                    // Tutor name and reason
                     const tutorHeader = document.createElement('h4');
                     tutorHeader.className = "text-xl font-semibold text-indigo-900 mb-4";
-                    tutorHeader.innerHTML = `สอนแทน ${tutorEntry.tutorName}
-                        <span class="font-normal text-slate-700 text-base block md:inline md:ml-2">
-                            (${tutorEntry.reason})
-                        </span>`;
+                    tutorHeader.innerHTML = `สอนแทน ${tutorEntry.tutorName} <span class="font-normal text-slate-700 text-base block md:inline md:ml-2">(${tutorEntry.reason})</span>`;
                     entryDiv.appendChild(tutorHeader);
-
-                    // List of substitutions
                     const subList = document.createElement('ul');
                     subList.className = "list-disc list-inside space-y-3 pl-2";
-
                     tutorEntry.substitutions.forEach(sub => {
                         const listItem = document.createElement('li');
                         listItem.className = "text-slate-800 text-base md:text-lg";
-
-                        let subTeacherHtml;
-                        if (sub.subTeacher) {
-                            subTeacherHtml = `<strong class="text-green-700 ml-1">${sub.subTeacher}</strong>`;
-                        } else {
-                            subTeacherHtml = `<strong class="text-red-600 ml-1">หาคนสอนแทนไม่ได้</strong>`;
-                        }
-
-                        listItem.innerHTML = `
-                            <strong class="text-slate-900">คาบ ${sub.period}:</strong> ${sub.classInfo} →
-                            ${subTeacherHtml}
-                            <span class="text-sm text-slate-500 block md:inline md:ml-2">
-                                (${sub.reason})
-                            </span>`;
+                        let subTeacherHtml = sub.subTeacher ? `<strong class="text-green-700 ml-1">${sub.subTeacher}</strong>` : `<strong class="text-red-600 ml-1">หาคนสอนแทนไม่ได้</strong>`;
+                        listItem.innerHTML = `<strong class="text-slate-900">คาบ ${sub.period}:</strong> ${sub.classInfo} → ${subTeacherHtml} <span class="text-sm text-slate-500 block md:inline md:ml-2">(${sub.reason})</span>`;
                         subList.appendChild(listItem);
                     });
-
                     entryDiv.appendChild(subList);
-                    resultsDiv.appendChild(entryDiv);
+                    teacherScheduleDetails.appendChild(entryDiv);
                 });
             } else {
-                // No O-NET or no substitutions needed - Append header first
-                 resultsDiv.appendChild(header); // Still show the date header
-                 const noDataPara = document.createElement('p');
-                noDataPara.className = "text-center text-slate-500 text-xl font-medium py-8";
-                noDataPara.textContent = dayOfWeekText ? `ไม่มีการติว O-NET หรือไม่มีคาบสอนแทนในวันนี้` : "กรุณาเลือกวันที่ที่ถูกต้อง";
-                resultsDiv.appendChild(noDataPara);
+                 teacherNoDataEl.textContent = scheduleData.dayOfWeekText ? `ไม่มีการติว O-NET หรือไม่มีคาบสอนแทนในวันนี้` : "กรุณาเลือกวันที่ที่ถูกต้อง";
+                 teacherNoDataEl.classList.remove('hidden');
             }
         }
 
+        // *** UPDATED Function to render the STUDENT schedule (Filtered) ***
+        function renderStudentSchedule(scheduleData) {
+             studentScheduleDetails.innerHTML = ''; // Clear previous student schedule
+             studentNoDataEl.classList.add('hidden');
+             studentHeaderEl.innerHTML = `🧑‍🎓 ตารางเรียน ${scheduleData.dayOfWeekText} ${scheduleData.fullDateText} (เฉพาะคาบที่มีการสอนแทน)`; // Updated Header
+
+             const grades = Object.keys(scheduleData.studentScheduleByGrade).sort(); // Sort grades P.1, P.2... M.1...
+             let hasAnySubstitution = false; // Flag to check if any grade has subs
+
+             grades.forEach(grade => {
+                 const fullGradeSchedule = scheduleData.studentScheduleByGrade[grade];
+                 // Filter for substitute classes ONLY for this grade
+                 const substituteClasses = fullGradeSchedule.filter(cls => cls.isSubstitute);
+
+                 // Only proceed if this grade has substitute classes
+                 if (substituteClasses.length > 0) {
+                     hasAnySubstitution = true; // Mark that we found at least one sub
+
+                     const gradeDiv = document.createElement('div');
+                     gradeDiv.className = "bg-blue-50 p-5 rounded-lg shadow-md border border-blue-200 mb-4"; // Different color for student view
+
+                     const gradeHeader = document.createElement('h4');
+                     gradeHeader.className = "text-xl font-semibold text-blue-900 mb-3";
+                     gradeHeader.textContent = `ระดับชั้น ${grade}`;
+                     gradeDiv.appendChild(gradeHeader);
+
+                     const classList = document.createElement('ul');
+                     classList.className = "list-none space-y-2"; // Use list-none for cleaner look
+
+                     // Iterate ONLY through the filtered substitute classes
+                     substituteClasses.forEach(cls => {
+                         const listItem = document.createElement('li');
+                         listItem.className = "text-slate-800 text-base md:text-lg border-b border-blue-100 pb-1";
+
+                         // Teacher name will always be substitute here
+                         const teacherNameHtml = `<strong class="text-orange-600">${cls.teacher} (สอนแทน)</strong>`;
+
+                         listItem.innerHTML = `
+                             <strong class="text-blue-800 w-16 inline-block">คาบ ${cls.period}:</strong>
+                             <span class="font-medium mr-2">${cls.subject}</span>
+                             → ${teacherNameHtml}
+                         `;
+                         classList.appendChild(listItem);
+                     });
+
+                     gradeDiv.appendChild(classList);
+                     studentScheduleDetails.appendChild(gradeDiv);
+                 } // End if (substituteClasses.length > 0)
+             }); // End forEach grade
+
+             // Show no data message ONLY if NO grades had any substitutions
+             if (!hasAnySubstitution) {
+                  studentNoDataEl.textContent = scheduleData.dayOfWeekText ? `ไม่มีคาบเรียนที่มีการสอนแทนในวันนี้` : "กรุณาเลือกวันที่ที่ถูกต้อง"; // Updated no data text
+                  studentNoDataEl.classList.remove('hidden');
+             }
+        }
+
+
+        // Main function to generate and render both schedules
+        function generateAndRenderAllSchedules() {
+            const selectedDateValue = datePicker.value;
+            const dateKey = formatDateToKey(selectedDateValue);
+            currentFullSchedule = generateSchedules(dateKey); // Store the full results
+
+            renderTeacherSchedule(currentFullSchedule);
+            renderStudentSchedule(currentFullSchedule);
+        }
+
+        // --- Tab Switching Logic ---
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // Deactivate all buttons and content
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabContents.forEach(content => content.classList.remove('active'));
+
+                // Activate clicked button and corresponding content
+                button.classList.add('active');
+                const tabId = button.getAttribute('data-tab');
+                document.getElementById(tabId + '-content').classList.add('active');
+            });
+        });
+
+
         // --- Event Listeners ---
-        datePicker.addEventListener('change', renderSchedule);
+        datePicker.addEventListener('change', generateAndRenderAllSchedules);
 
         exportBtn.addEventListener('click', async () => {
-            const scheduleElement = document.getElementById('schedule-results');
-            if (!scheduleElement || scheduleElement.children.length === 0 || scheduleElement.querySelector('p')) {
-                showToast('ไม่มีตารางสอนให้ Export');
-                return;
-            }
+             // Target the *currently active tab's content* for export
+             const activeTabContent = document.querySelector('.tab-content.active');
+             // Determine which no-data element corresponds to the active tab
+             const isActiveTabTeacher = activeTabContent.id === 'teacher-schedule-content';
+             const noDataElement = isActiveTabTeacher ? teacherNoDataEl : studentNoDataEl;
+             const exportFileNamePrefix = isActiveTabTeacher ? 'ตารางสอนแทน' : 'ตารางเรียน';
 
-            // Removed fixed width style application
+
+             if (!activeTabContent || !currentFullSchedule || noDataElement.offsetParent !== null ) { // Check if noDataElement is visible
+                 showToast(`ไม่มี${exportFileNamePrefix}ให้ Export`);
+                 return;
+             }
 
             try {
-                const canvas = await html2canvas(scheduleElement, {
-                    scale: 3, // Increase scale for better quality
+                const canvas = await html2canvas(activeTabContent, { // Capture the active tab content
+                    scale: 3,
                     useCORS: true,
                     backgroundColor: '#ffffff'
                 });
                 const link = document.createElement('a');
-                link.download = `ตารางสอนแทน-${datePicker.value}.jpg`;
+                link.download = `${exportFileNamePrefix}-${datePicker.value}.jpg`; // Dynamic filename
                 link.href = canvas.toDataURL('image/jpeg', 0.95);
                 link.click();
+
             } catch (err) {
                 console.error("Error exporting image:", err);
                 showToast('เกิดข้อผิดพลาดในการ Export รูปภาพ');
             }
-            // Removed finally block that removed fixed width
         });
 
-        // Updated Share Button Logic
         shareBtn.addEventListener('click', async () => {
-            const scheduleElement = document.getElementById('schedule-results');
-            const dateValue = datePicker.value;
+             // Target the *currently active tab's content* for sharing
+             const activeTabContent = document.querySelector('.tab-content.active');
+             const isActiveTabTeacher = activeTabContent.id === 'teacher-schedule-content';
+             const noDataElement = isActiveTabTeacher ? teacherNoDataEl : studentNoDataEl;
+             const shareTitlePrefix = isActiveTabTeacher ? 'ตารางสอนแทน' : 'ตารางเรียน';
+             const dateValue = datePicker.value;
 
-            if (!scheduleElement || scheduleElement.children.length === 0 || scheduleElement.querySelector('p')) {
-                showToast('ไม่มีตารางสอนให้แชร์');
-                return;
-            }
 
-            // Removed fixed width style application
+             if (!activeTabContent || !currentFullSchedule || noDataElement.offsetParent !== null) { // Check visibility
+                 showToast(`ไม่มี${shareTitlePrefix}ให้แชร์`);
+                 return;
+             }
 
-            try {
-                const canvas = await html2canvas(scheduleElement, {
+             try {
+                const canvas = await html2canvas(activeTabContent, { // Capture active tab
                     scale: 2,
                     backgroundColor: '#ffffff',
                     useCORS: true
                 });
-
-                // Removed fixed width style removal here
 
                 canvas.toBlob(async (blob) => {
                     if (!blob) {
                         showToast('ไม่สามารถสร้างรูปภาพได้');
                         return;
                     }
-                    const fileName = `ตารางสอนแทน-${dateValue}.jpg`;
+                    const fileName = `${shareTitlePrefix}-${dateValue}.jpg`; // Dynamic filename
                     const file = new File([blob], fileName, { type: 'image/jpeg' });
                     const shareData = {
                         files: [file],
-                        title: `ตารางสอนแทนวันที่ ${dateValue}`,
-                        text: `ตารางสอนแทนวันที่ ${dateValue}`,
+                        title: `${shareTitlePrefix}วันที่ ${dateValue}`, // Dynamic title
+                        text: `${shareTitlePrefix}วันที่ ${dateValue}`, // Dynamic text
                     };
 
                     if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
@@ -1527,25 +1655,21 @@
             } catch (err) {
                 console.error('Error generating or sharing image:', err);
                 showToast('เกิดข้อผิดพลาดในการแชร์รูปภาพ กรุณา Export แล้วแชร์ด้วยตนเอง');
-                 // Removed fixed width style removal here too
             }
         });
 
 
         // Fallback copy function (not used for image share)
         function copyUsingExecCommand(text) {
-             // ... (implementation remains the same) ...
-            const textArea = document.createElement("textarea");
+             const textArea = document.createElement("textarea");
             textArea.value = text;
-            textArea.style.position = "fixed";  // Avoid scrolling to bottom
+            textArea.style.position = "fixed";
             textArea.style.top = "0";
             textArea.style.left = "0";
-            textArea.style.opacity = "0"; // Make it invisible
-
+            textArea.style.opacity = "0";
             document.body.appendChild(textArea);
             textArea.focus();
             textArea.select();
-
             try {
                 const successful = document.execCommand('copy');
                 if (successful) {
@@ -1557,14 +1681,14 @@
                  console.error('Fallback: Oops, unable to copy', err);
                  showToast('ไม่สามารถคัดลอกได้');
             }
-
             document.body.removeChild(textArea);
         }
 
         // --- Initial Load ---
-        document.addEventListener('DOMContentLoaded', renderSchedule);
+        document.addEventListener('DOMContentLoaded', generateAndRenderAllSchedules); // Use the combined function
 
     </script>
 
 </body>
 </html>
+
