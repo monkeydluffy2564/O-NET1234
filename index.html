@@ -3,923 +3,1561 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>แอปจัดตารางสอนแทนอัจฉริยะ</title>
+    <title>ระบบจัดตารางสอนแทน O-NET</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;700&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <!-- Google Fonts: Sarabun -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+    <!-- html2canvas library for exporting -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    
-    <!-- START ADD: Firebase SDK -->
-    <script type="module">
-        // Import the functions you need from the SDKs you need
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"; // MOD: Removed signInWithCustomToken
-        import { getFirestore, doc, setDoc, getDoc, setLogLevel as setFirestoreLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Your web app's Firebase configuration
-        const firebaseConfig = {
-             apiKey: "AIzaSyAJsk4l8I8uCYpJY8jZLAlRW1w2qLWN-2o",
-             authDomain: "game24-69666.firebaseapp.com",
-             projectId: "game24-69666",
-             storageBucket: "game24-69666.firebasestorage.app",
-             messagingSenderId: "989271279576",
-             appId: "1:989271279576:web:43115bbaeeae31160954ad",
-             measurementId: "G-B1ZTE90SGG"
-        };
-
-        let appId;
-        // MOD: Removed initialAuthToken declaration as it's no longer used with public config
-
-        // Use global vars provided by the environment for appId
-        try {
-            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        } catch (e) {
-            console.error("Failed to get appId:", e);
-            appId = 'default-app-id';
-        }
-
-
-// ...
-        let app, auth, db;
-        let currentUserId = null;
-        let linksDocRef = null;
-
-        try {
-            app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
-            setFirestoreLogLevel('Debug');
-
-            // ▼▼▼ จุดแก้ไขที่ 1: กำหนด path กลาง ที่นี่เลย! ▼▼▼
-            // เราสร้าง path ที่ไม่มี User ID แต่ใช้ appId เพื่อแยกข้อมูลระหว่างแอปได้
-            linksDocRef = doc(db, 'artifacts', appId, 'substitutionApp', 'sharedLinks'); // <-- ★ ลบ const ออก
-            // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-
-            // --- Firebase Auth and Data Loading ---
-            onAuthStateChanged(auth, async (user) => {
-                const saveButton = document.getElementById('save-links-button');
-                const onetLinkInput = document.getElementById('onet-link-input');
-                const teacherLinkInput = document.getElementById('teacher-link-input');
-                const authStatus = document.getElementById('auth-status');
-
-                if (user) {
-                    currentUserId = user.uid; // ยังเก็บ UID ไว้ดูสถานะได้ แต่ไม่ใช้ใน path แล้ว
-                    console.log("User is signed in anonymously with UID:", currentUserId);
-                    authStatus.textContent = `เชื่อมต่อฐานข้อมูลสำเร็จ (UID: ${currentUserId.substring(0, 8)}...)`;
-                    authStatus.classList.remove('text-red-500');
-                    authStatus.classList.add('text-green-600');
-                    
-                    // ★ จุดแก้ไขที่ 2: ไม่ต้องกำหนด linksDocRef ในนี้อีกต่อไป เพราะเราใช้ตัวแปรกลางที่สร้างไว้ด้านบน
-
-                    // Try to load saved links from the shared document
-                    try {
-                        const docSnap = await getDoc(linksDocRef); // ★ ใช้ linksDocRef กลาง
-                        if (docSnap.exists()) {
-                            const data = docSnap.data();
-                            console.log("Loaded SHARED links from Firestore:", data);
-                            onetLinkInput.value = data.onetUrl || '';
-                            teacherLinkInput.value = data.teacherUrl || '';
-                            if (onetLinkInput.value) {
-                                setTimeout(() => {
-                                    onetLinkInput.dispatchEvent(new Event('blur'));
-                                }, 0);
-                            }
-                        } else {
-                            console.log("No SHARED links document found.");
-                        }
-                    } catch (e) {
-                        console.error("Error loading shared links:", e);
-                    }
-                    saveButton.disabled = false;
-
-                } else {
-                    console.log("User is signed out.");
-                    authStatus.textContent = 'ยังไม่เชื่อมต่อฐานข้อมูล (กรุณารีเฟรช)';
-                    authStatus.classList.add('text-red-500');
-                    authStatus.classList.remove('text-green-600');
-                    currentUserId = null;
-                    // linksDocRef ไม่ต้องเป็น null แล้ว เพราะเป็นค่าคงที่
-                    saveButton.disabled = true;
-                }
-            });
-            // ...
-
-            // START MOD: Always sign in anonymously when using public config
-            console.log("Using public config, signing in anonymously...");
-            await signInAnonymously(auth);
-            // END MOD
-
-        } catch (e) {
-            console.error("Firebase Initialization Error:", e);
-            const authStatus = document.getElementById('auth-status');
-            if(authStatus) authStatus.textContent = 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้';
-        }
-
-        // --- Save Links Logic ---
-        window.saveLinks = async () => {
-            const saveButton = document.getElementById('save-links-button');
-            const authStatus = document.getElementById('auth-status');
-            if (!linksDocRef) {
-                console.error("Firestore doc ref is not ready.");
-                return;
-            }
-
-            const onetUrl = document.getElementById('onet-link-input').value.trim();
-            const teacherUrl = document.getElementById('teacher-link-input').value.trim();
-
-            saveButton.disabled = true;
-            saveButton.textContent = 'กำลังบันทึก...';
-            
-            try {
-                await setDoc(linksDocRef, { 
-                    onetUrl: onetUrl, 
-                    teacherUrl: teacherUrl 
-                });
-                console.log("Links saved to Firestore.");
-                authStatus.textContent = 'บันทึกลิงก์สำเร็จ!';
-                setTimeout(() => {
-                    if (auth.currentUser) {
-                         authStatus.textContent = `เชื่อมต่อฐานข้อมูลสำเร็จ (UID: ${currentUserId.substring(0, 8)}...)`;
-                    }
-                }, 2000);
-
-            } catch (e) {
-                console.error("Error saving links:", e);
-                authStatus.textContent = 'บันทึกลิงก์ไม่สำเร็จ';
-            } finally {
-                saveButton.disabled = false;
-                saveButton.textContent = 'บันทึกลิงก์';
-            }
-        };
-
-        // Make functions globally available for inline/button clicks
-        window.triggerFileUpload = (inputId) => {
-            document.getElementById(inputId).click();
-        };
-
-    </script>
-    <!-- END ADD -->
-
-    <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js`;
-    </script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
     <style>
         body {
             font-family: 'Sarabun', sans-serif;
         }
-        /* ... (previous styles) ... */
-        .spinner {
-            border-top-color: #3498db;
-            animation: spin 1s linear infinite;
+        /* Style the date picker icon */
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+            filter: invert(0.6) sepia(0.5) saturate(5) hue-rotate(200deg); /* Adjust color to match theme */
         }
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
+        /* Style for the buttons - Updated */
+        .action-button {
+            @apply inline-flex items-center justify-center px-5 py-2.5 text-base font-medium text-center text-white rounded-lg shadow-md transition duration-150 ease-in-out focus:ring-4 focus:outline-none;
         }
-        #results-output {
-            font-family: 'Sarabun', sans-serif;
-            font-size: 0.9rem; /* 14px */
-            line-height: 1.6;
-            white-space: normal; /* Allow wrapping */
+        .export-button {
+             @apply bg-green-600 hover:bg-green-700 focus:ring-green-300;
         }
-        .date-heading {
-            font-size: 1.25rem; /* 20px */
-            font-weight: 700;
-            color: #1f2937; /* gray-800 */
-            margin-bottom: 0.75rem; /* mb-3 */
-            border-bottom: 2px solid #e5e7eb; /* border-gray-200 */
-            padding-bottom: 0.5rem; /* pb-2 */
+        .share-button {
+             @apply bg-blue-600 hover:bg-blue-700 focus:ring-blue-300; /* Keep blue for share */
         }
-        .teacher-heading {
-            font-size: 1.1rem; /* ~17px */
-            font-weight: 600;
-            color: #111827; /* gray-900 */
-            margin-top: 1rem; /* mt-4 */
-            margin-bottom: 0.5rem; /* mb-2 */
+         /* Simple toast notification style */
+        #toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #333;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 5px;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+            z-index: 1000;
+            max-width: 90%;
+            text-align: center;
         }
-        .substitution-line {
-            background-color: #fefce8; /* yellow-50 */
-            border: 1px solid #fde047; /* yellow-300 */
-            border-left-width: 4px;
-            border-left-color: #facc15; /* yellow-400 */
-            padding: 0.5rem 0.75rem; /* p-2 px-3 */
-            margin-bottom: 0.5rem; /* mb-2 */
-            border-radius: 0.375rem; /* rounded-md */
+        #toast.show {
+            opacity: 1;
         }
-        .no-substitution-line {
-            padding: 0.25rem 0.75rem; /* py-1 px-3 */
-            margin-bottom: 0.25rem; /* mb-1 */
-            color: #6b7280; /* gray-500 */
+        /* Ensure the date input itself is centered */
+        #date-picker-container {
+            display: flex;
+            justify-content: center;
         }
-        input:checked ~ .dot {
-            transform: translateX(1.5rem); /* 24px */
-        }
-        input:checked ~ .block {
-            background-color: #2563eb; /* blue-600 */
-        }
-        .show-subs-only .no-substitution-line {
-            display: none;
-        }
-        /* Style for hidden file input */
-        .hidden-file-input {
-            display: none;
+        /* Style added in previous turn, ensuring it is present */
+        input[type="date"] {
+             @apply w-auto max-w-xs p-3 border border-slate-300 rounded-lg text-lg text-center shadow-sm focus:ring-indigo-500 focus:border-indigo-500;
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
-    <div class="container mx-auto max-w-4xl w-full">
-        <div class="bg-white rounded-2xl shadow-xl p-6 md:p-10">
-            <div class="text-center mb-8">
-                <h1 class="text-3xl md:text-4xl font-bold text-gray-800">แอปจัดตารางสอนแทนอัจฉริยะ</h1>
-                <p class="text-gray-500 mt-2">ใส่ลิงก์ตาราง หรืออัปโหลดไฟล์ เพื่อให้ AI ช่วยวิเคราะห์</p>
-            </div>
+<body class="bg-slate-100">
 
-            <!-- START MOD: URL Input Section -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                <!-- O-NET Link -->
-                <div>
-                    <label for="onet-link-input" class="block mb-2 text-sm font-medium text-gray-700">ลิงก์ตารางติว O-NET (.txt, .pdf, Google Drive)</label>
-                    <div class="flex items-center">
-                        <input type="url" id="onet-link-input" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="https://...">
-                        <button onclick="triggerFileUpload('onet-schedule-upload')" class="ml-2 p-2.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg" title="Upload Fallback">
-                            <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                        </button>
-                        <input id="onet-schedule-upload" type="file" class="hidden-file-input" accept=".pdf,.txt" />
-                    </div>
-                    <p id="onet-filename" class="text-sm text-gray-600 mt-1 truncate"></p>
-                </div>
-                <!-- Teacher Schedule Link -->
-                <div>
-                    <label for="teacher-link-input" class="block mb-2 text-sm font-medium text-gray-700">ลิงก์ตารางสอนปกติ (.txt, .pdf, Google Drive)</label>
-                    <div class="flex items-center">
-                        <input type="url" id="teacher-link-input" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="https://...">
-                         <button onclick="triggerFileUpload('teacher-schedule-upload')" class="ml-2 p-2.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg" title="Upload Fallback">
-                            <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                        </button>
-                        <input id="teacher-schedule-upload" type="file" class="hidden-file-input" accept=".pdf,.txt" />
-                    </div>
-                    <p id="teacher-filename" class="text-sm text-gray-600 mt-1 truncate"></p>
+    <div class="min-h-screen p-4 md:p-8">
+        <div class="max-w-4xl mx-auto bg-white p-6 md:p-8 rounded-2xl shadow-lg">
+            <h1 class="text-3xl font-bold text-center text-indigo-800 mb-6">
+                ระบบจัดตารางสอนแทน O-NET
+            </h1>
+
+            <div class="mb-8 text-center"> <!-- Added text-center here -->
+                <label for="date-picker" class="block text-lg font-medium text-slate-700 mb-3">
+                    กรุณาเลือกวันที่
+                </label>
+                 <!-- Wrapped input in a div for better centering control -->
+                <div id="date-picker-container">
+                    <input
+                        type="date"
+                        id="date-picker"
+                        value="2025-11-10" <!-- Set default date -->
                 </div>
             </div>
 
-            <!-- Save Links Button & Status -->
-            <div class="flex justify-between items-center mb-6">
-                <button id="save-links-button" onclick="saveLinks()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition focus:outline-none focus:ring-4 focus:ring-green-300 disabled:bg-gray-400" disabled>
-                    บันทึกลิงก์
+             <!-- Action Buttons - Updated Share Button -->
+             <div class="flex flex-col sm:flex-row justify-center items-center space-y-3 sm:space-y-0 sm:space-x-4 mb-8">
+                <button id="export-btn" class="action-button export-button w-full sm:w-auto">
+                    <i class="fas fa-file-export mr-2"></i> Export ตารางสอน (JPG)
                 </button>
-                <span id="auth-status" class="text-sm text-gray-500">กำลังเชื่อมต่อฐานข้อมูล...</span>
-            </div>
-            <!-- END MOD -->
-
-
-            <!-- Date Input -->
-            <div class="mb-6">
-                 <label for="date-input" class="block mb-2 text-sm font-medium text-gray-700">เลือกวันที่ต้องการจัดตาราง</label>
-                 <select id="date-input" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 disabled:bg-gray-200 disabled:cursor-not-allowed" disabled>
-                    <option value="">กรุณาใส่ลิงก์ หรืออัปโหลดตารางติว O-NET</option>
-                 </select>
-            </div>
-
-            <!-- Action Button -->
-            <div class="text-center mb-6">
-                <button id="analyze-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center mx-auto">
-                    <svg id="button-icon" class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
-                    <div id="spinner" class="spinner w-5 h-5 rounded-full border-4 border-t-4 border-white mr-2 hidden"></div>
-                    <span id="button-text">วิเคราะห์และจัดตาราง</span>
+                <button id="share-btn" class="action-button share-button w-full sm:w-auto">
+                   <i class="fas fa-share-square mr-2"></i> แชร์รูปภาพ <!-- Changed Icon & Text -->
                 </button>
             </div>
-             <p id="error-message" class="text-center text-sm text-red-600 mt-2"></p>
 
-            <!-- Results Section (No changes here) -->
-            <div id="results-container" class="mt-8 p-6 bg-gray-50 rounded-lg border border-gray-200 hidden">
-                <div class="flex justify-between items-center mb-4 pb-4 border-b border-gray-200">
-                    <h2 class="text-2xl font-bold text-gray-800">ผลการจัดตารางสอนแทน</h2>
-                    <div class="flex items-center space-x-4">
-                        <button id="export-jpg-button" class="flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 transition disabled:text-gray-400 disabled:cursor-not-allowed">
-                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                            <span id="export-button-text">Export รูปภาพ</span>
-                        </button>
-                        <label for="toggle-details" class="flex items-center cursor-pointer">
-                            <span class="mr-3 text-sm font-medium text-gray-700">แสดงเฉพาะคาบที่สอนแทน</span>
-                            <div class="relative">
-                                <input type="checkbox" id="toggle-details" class="sr-only">
-                                <div class="block bg-gray-300 w-14 h-8 rounded-full transition"></div>
-                                <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition transform"></div>
-                            </div>
-                        </label>
-                    </div>
-                </div>
-                <div id="results-output" class="text-gray-700 bg-white p-4 rounded-md shadow-inner text-sm leading-relaxed"></div>
+            <hr class="my-8" />
+
+            <div id="schedule-results" class="space-y-6 bg-white p-1"> <!-- Added bg-white and p-1 for better capture -->
+                <!-- Results will be rendered here by JavaScript -->
             </div>
         </div>
-        <footer class="text-center mt-6 text-gray-500 text-sm">
-            <p>&copy; 2024 Smart Substitution App. Powered by Gemini.</p>
-        </footer>
     </div>
 
-    <script type="module">
-        // This script tag is now a module to support Firebase imports.
-        // All non-module script content has been moved inside here or the Firebase module tag.
-        
-        // --- START: Policy and Constants (Simplified) ---
-        const teacherRoles = `
-        ครูติว: อมรเทพ(คณิต), ณัฐชนม์(วิทย์), ดำเนิน(ไทย), อรุณลักษณ์(อังกฤษ ป.6), สายรุ้ง(อังกฤษ ม.3)
-        ครูทั่วไป: เอกพจน์(ม.1-3), บรรจง(ป.4-ม.3), พจนาจ(ป.1-6), กฤษติยา(ป.4-ม.3), วิไลวรรณ(ป.1-6), กมลลักษณ์(ป.1-ม.3)
-        ครูเฉพาะ: วิภาวัลย์(ป.1), วิภารักษ์(ป.2), วิไลพร(ป.3), คีร่า(อังกฤษ ป.1-ม.3)
-        เงื่อนไขสอนแทนครูติว: อมรเทพ(ป.4-ม.3), ณัฐชนม์(ป.4-ม.3), ดำเนิน(ป.4-ม.3), อรุณลักษณ์(ป.1-ป.6), สายรุ้ง(ป.4-ม.3)
-        `;
+    <!-- Toast Notification Element -->
+    <div id="toast">ข้อความแจ้งเตือน</div>
 
-        const resultFormat = `
-        <div class="date-heading">YYYY/MM/DD</div>
-        <div class="teacher-heading">สอนแทน ครู[ชื่อครู] (ติดติว O-NET [วิชา] [ชั้น] เวลา [HH:MM-HH:MM น.]):</div>
-        <div class="substitution-line">- คาบ X: [ชั้น/วิชา] → <strong>ครู[ชื่อผู้สอนแทน]</strong> (เหตุผล: [ระบุเหตุผล])</div>
-        <div class="no-substitution-line">- คาบ X: ... → ไม่มีคาบที่ต้องสอนแทน (เหตุผล: [ระบุเหตุผล])</div>
-        `;
-        // --- END: Policy and Constants (Simplified) ---
+    <script>
+        // --- DATABASE: O-NET Schedule ---
+        const onetData = {
+          "10/11/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+          ],
+          "11/11/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+          ],
+          "12/11/2568": [
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+          ],
+          "13/11/2568": [
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+          ],
+          "14/11/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+          ],
+          "17/11/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+          ],
+          "18/11/2568": [
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+          ],
+          "19/11/2568": [
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+          ],
+          "20/11/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+          ],
+          "21/11/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+          ],
+          "24/11/2568": [
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+          ],
+          "25/11/2568": [
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+          ],
+          "26/11/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+          ],
+          "27/11/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+          ],
+          "28/11/2568": [
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+          ],
+          "01/12/2568": [
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+          ],
+          "02/12/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+          ],
+          "03/12/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+          ],
+          "04/12/2568": [
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+          ],
+          "08/12/2568": [
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+          ],
+          "09/12/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+          ],
+          "11/12/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+          ],
+          "12/12/2568": [
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+          ],
+          "15/12/2568": [
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+          ],
+          "16/12/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+          ],
+          "17/12/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+          ],
+          "18/12/2568": [
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+          ],
+          "19/12/2568": [
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+          ],
+          "22/12/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+          ],
+          "23/12/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+          ],
+          "24/12/2568": [
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+          ],
+          "25/12/2568": [
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+          ],
+          "29/12/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+          ],
+          "30/12/2568": [
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+          ],
+          "31/12/2568": [
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+          ],
+          "06/01/2569": [
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+          ],
+          "07/01/2569": [
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+          ],
+          "08/01/2569": [
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+          ],
+          "09/01/2569": [
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+          ],
+          "12/01/2569": [
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+          ],
+          "13/01/2569": [
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+          ],
+          "14/01/2569": [
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+          ],
+          "15/01/2569": [
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+          ],
+          "16/01/2569": [
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+          ],
+          "20/01/2569": [
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+          ],
+          "21/01/2569": [
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+          ],
+          "22/01/2569": [
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+          ],
+          "23/01/2569": [
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+          ],
+          "26/01/2569": [
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+          ],
+          "27/01/2569": [
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '12:30 - 15:30 น.' }
+          ],
+          "28/01/2569": [
+            { periods: [1, 2, 3], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '12:30 - 15:30 น.' }
+          ],
+          "29/01/2569": [
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ป.6', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ป.6', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ม.3', teacher: 'ครูสายรุ้ง เรืองสุขสุด', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ม.3', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' }
+          ],
+          "30/01/2569": [
+            { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 15:30 น.' },
+            { periods: [1, 2, 3], subject: 'วิทยาศาสตร์', grade: 'ม.3', teacher: 'ครูณัฐชนม์ วงศ์มา', time: '08:30 - 11:30 น.' },
+            { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 15:30 น.' }
+          ]
+        };
 
-        // --- START: DOM Element References ---
-        // MOD: Updated IDs for file inputs
-        const onetScheduleInput = document.getElementById('onet-schedule-upload');
-        const teacherScheduleInput = document.getElementById('teacher-schedule-upload');
-        // NEW: Link inputs
-        const onetLinkInput = document.getElementById('onet-link-input');
-        const teacherLinkInput = document.getElementById('teacher-link-input');
-        
-        const dateInput = document.getElementById('date-input');
-        const analyzeButton = document.getElementById('analyze-button');
-        const resultsContainer = document.getElementById('results-container');
-        const resultsOutput = document.getElementById('results-output');
-        const onetFilename = document.getElementById('onet-filename');
-        const teacherFilename = document.getElementById('teacher-filename');
-        const errorMessage = document.getElementById('error-message');
-        const spinner = document.getElementById('spinner');
-        const buttonText = document.getElementById('button-text');
-        const buttonIcon = document.getElementById('button-icon');
-        const toggleDetailsInput = document.getElementById('toggle-details');
-        const exportJpgButton = document.getElementById('export-jpg-button');
-        const exportButtonText = document.getElementById('export-button-text');
-        // --- END: DOM Element References ---
-
-        // --- START: Date Helper Functions ---
-        function parseDateBE(dateStringBE) {
-            try {
-                const parts = dateStringBE.split('/');
-                if (parts.length !== 3) throw new Error('Invalid date format');
-                const day = parseInt(parts[0], 10);
-                const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
-                const beYear = parseInt(parts[2], 10);
-                const adYear = beYear - 543;
-                return new Date(Date.UTC(adYear, month, day));
-            } catch (e) {
-                console.error("Date parsing error:", e);
-                return null;
+        // --- DATABASE: Teacher Data & Schedules ---
+        const allTeacherData = [
+          // --- ครูติว O-NET ---
+          {
+            name: 'ครูณัฐชนม์ วงศ์มา',
+            type: 'tutor',
+            canTeachGrades: ['ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3'],
+            canTeachSpecial: null,
+            schedule: {
+              'วันจันทร์': [
+                { period: 1, subject: 'วิทยาศาสตร์และเทคฯ', grade: 'ม.1' },
+                { period: 2, subject: 'วิทยาศาสตร์และเทคฯ 6', grade: 'ป.6' },
+                { period: 3, subject: 'วิทยาศาสตร์และเทคฯ 4', grade: 'ป.4' },
+                { period: 4, subject: 'ซ่อมเสริม', grade: 'ป.5' },
+                { period: 5, subject: 'วิทยาศาสตร์และเทคฯ', grade: 'ม.2' },
+                { period: 6, subject: 'วางทุกงานอ่านทุกคน', grade: 'ป.5' }
+              ],
+              'วันอังคาร': [
+                { period: 1, subject: 'วิทยาศาสตร์และเทคฯ 4', grade: 'ป.4' },
+                { period: 2, subject: 'วิทยาศาสตร์และเทคฯ', grade: 'ม.2' },
+                { period: 3, subject: 'วิทยาศาสตร์และเทคฯ 5', grade: 'ป.5' },
+                { period: 4, subject: 'วิทยาศาสตร์และเทคฯ', grade: 'ม.1' },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: null, grade: null }
+              ],
+              'วันพุธ': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: 'วิทยาศาสตร์และเทคฯ 6', grade: 'ป.6' },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: 'วิทยาศาสตร์ฯ (เพิ่มเติม)', grade: 'ม.1' },
+                { period: 5, subject: 'วิทยาศาสตร์และเทคฯ', grade: 'ม.3' },
+                { period: 6, subject: 'ลูกเสือ', grade: null }
+              ],
+              'วันพฤหัสบดี': [
+                { period: 1, subject: 'วิทยาศาสตร์และเทคฯ', grade: 'ม.3' },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: 'สุขศึกษาและพลศึกษา 5', grade: 'ป.5' },
+                { period: 4, subject: 'สุขศึกษาและพลศึกษา 4', grade: 'ป.4' },
+                { period: 5, subject: 'วางทุกงานอ่านทุกคน', grade: 'ป.5' },
+                { period: 6, subject: 'ชุมนุม', grade: null }
+              ],
+              'วันศุกร์': [
+                { period: 1, subject: 'วิทยาศาสตร์ฯ (เพิ่มเติม)', grade: 'ม.2' },
+                { period: 2, subject: 'วิทยาศาสตร์ฯ (เพิ่มเติม)', grade: 'ม.3' },
+                { period: 3, subject: 'วิทยาศาสตร์และเทคฯ 5', grade: 'ป.5' },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'PLC', grade: null }
+              ]
             }
+          },
+          {
+            name: 'ครูดำเนิน ว่าดี',
+            type: 'tutor',
+            canTeachGrades: ['ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3'],
+            canTeachSpecial: null,
+            schedule: {
+              'วันจันทร์': [
+                { period: 1, subject: 'ภาษาไทย 6', grade: 'ป.6' },
+                { period: 2, subject: 'ศิลปะ (ทัศนศิลป์)', grade: 'ม.3' },
+                { period: 3, subject: 'ภาษาไทย', grade: 'ม.1' },
+                { period: 4, subject: 'ภาษาไทย', grade: 'ม.2' },
+                { period: 5, subject: 'ภาษาไทย', grade: 'ม.3' },
+                { period: 6, subject: 'ศิลปะ (ดนตรี)', grade: 'ม.1' }
+              ],
+              'วันอังคาร': [
+                { period: 1, subject: 'ภาษาไทย 6', grade: 'ป.6' },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: 'ภาษาไทย', grade: 'ม.1' },
+                { period: 4, subject: 'ภาษาไทย', grade: 'ม.3' },
+                { period: 5, subject: 'ศิลปะ (ดนตรี)', grade: 'ม.3' },
+                { period: 6, subject: 'แนะแนว', grade: 'ป.6' }
+              ],
+              'วันพุธ': [
+                { period: 1, subject: 'ภาษาไทย', grade: 'ม.1' },
+                { period: 2, subject: 'ภาษาไทย', grade: 'ม.3' },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: 'ศิลปะ (ทัศนศิลป์)', grade: 'ม.2' },
+                { period: 6, subject: 'ลูกเสือ', grade: null }
+              ],
+              'วันพฤหัสบดี': [
+                { period: 1, subject: 'ภาษาไทย 6', grade: 'ป.6' },
+                { period: 2, subject: 'ภาษาไทย', grade: 'ม.2' },
+                { period: 3, subject: 'ศิลปะ (ดนตรี)', grade: 'ม.2' },
+                { period: 4, subject: 'วิทยาการคำนวณ 6', grade: 'ป.6' },
+                { period: 5, subject: 'ศิลปะ (ทัศนศิลป์)', grade: 'ม.1' },
+                { period: 6, subject: 'ชุมนุม', grade: null }
+              ],
+              'วันศุกร์': [
+                { period: 1, subject: 'ภาษาไทย 6', grade: 'ป.6' },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: 'ภาษาไทย', grade: 'ม.2' },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'PLC', grade: null }
+              ]
+            }
+          },
+          {
+            name: 'ครูอมรเทพ จันทร์ครบ',
+            type: 'tutor',
+            canTeachGrades: ['ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3'],
+            canTeachSpecial: null,
+            schedule: {
+              'วันจันทร์': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: 'คณิตศาสตร์', grade: 'ม.1' },
+                { period: 3, subject: 'คณิตศาสตร์', grade: 'ม.2' },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: 'คณิตศาสตร์ 6', grade: 'ป.6' },
+                { period: 6, subject: null, grade: null }
+              ],
+              'วันอังคาร': [
+                { period: 1, subject: 'คณิตศาสตร์', grade: 'ม.2' },
+                { period: 2, subject: 'คณิตศาสตร์', grade: 'ม.1' },
+                { period: 3, subject: 'คณิตศาสตร์', grade: 'ม.3' },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: 'คณิตศาสตร์ 6', grade: 'ป.6' },
+                { period: 6, subject: null, grade: null }
+              ],
+              'วันพุธ': [
+                { period: 1, subject: 'วางทุกงานอ่านทุกคน', grade: 'ป.6' },
+                { period: 2, subject: 'คณิตศาสตร์', grade: 'ม.1' },
+                { period: 3, subject: 'คณิตศาสตร์', grade: 'ม.3' },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: 'คณิตศาสตร์ 6', grade: 'ป.6' },
+                { period: 6, subject: 'ลูกเสือ', grade: null }
+              ],
+              'วันพฤหัสบดี': [
+                { period: 1, subject: 'คณิตศาสตร์', grade: 'ม.2' },
+                { period: 2, subject: 'คณิตศาสตร์', grade: 'ม.3' },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'ชุมนุม', grade: null }
+              ],
+              'วันศุกร์': [
+                { period: 1, subject: 'คณิตศาสตร์ (เพิ่มเติม)', grade: 'ม.1' },
+                { period: 2, subject: 'คณิตศาสตร์ (เพิ่มเติม)', grade: 'ม.2' },
+                { period: 3, subject: 'คณิตศาสตร์ (เพิ่มเติม)', grade: 'ม.3' },
+                { period: 4, subject: 'วิทยาการคำนวณ', grade: 'ม.3' },
+                { period: 5, subject: 'คณิตศาสตร์ 6', grade: 'ป.6' },
+                { period: 6, subject: 'แนะแนว', grade: 'ม.3' }
+              ]
+            }
+          },
+          {
+            name: 'ครูสายรุ้ง เรืองสุขสุด',
+            type: 'tutor',
+            canTeachGrades: ['ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3'],
+            canTeachSpecial: null,
+            schedule: {
+              'วันจันทร์': [
+                { period: 1, subject: 'อังกฤษพื้นฐาน', grade: 'ม.2' },
+                { period: 2, subject: 'อังกฤษ (เพิ่มเติม)', grade: 'ม.2' },
+                { period: 3, subject: 'อังกฤษ (เพิ่มเติม)', grade: 'ม.3' },
+                { period: 4, subject: 'อังกฤษพื้นฐาน', grade: 'ม.1' },
+                { period: 5, subject: 'อังกฤษเพิ่มเติม 3', grade: 'ป.3' },
+                { period: 6, subject: null, grade: null }
+              ],
+              'วันอังคาร': [
+                { period: 1, subject: 'อังกฤษพื้นฐาน', grade: 'ม.1' },
+                { period: 2, subject: 'อังกฤษพื้นฐาน 3', grade: 'ป.3' },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: 'อังกฤษพื้นฐาน', grade: 'ม.2' },
+                { period: 5, subject: 'วิทยาการคำนวณ', grade: 'ม.1' },
+                { period: 6, subject: null, grade: null }
+              ],
+              'วันพุธ': [
+                { period: 1, subject: 'อังกฤษพื้นฐาน', grade: 'ม.3' },
+                { period: 2, subject: 'อังกฤษพื้นฐาน', grade: 'ม.2' },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: 'อังกฤษพื้นฐาน 3', grade: 'ป.3' },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'ลูกเสือ', grade: null }
+              ],
+              'วันพฤหัสบดี': [
+                { period: 1, subject: 'อังกฤษพื้นฐาน 5', grade: 'ป.5' },
+                { period: 2, subject: 'อังกฤษ (เพิ่มเติม)', grade: 'ม.1' },
+                { period: 3, subject: 'อังกฤษพื้นฐาน', grade: 'ม.3' },
+                { period: 4, subject: 'แนะแนว', grade: 'ม.1' },
+                { period: 5, subject: 'อังกฤษพื้นฐาน 3', grade: 'ป.3' },
+                { period: 6, subject: 'ชุมนุม', grade: null }
+              ],
+              'วันศุกร์': [
+                { period: 1, subject: 'อังกฤษพื้นฐาน 5', grade: 'ป.5' },
+                { period: 2, subject: 'อังกฤษพื้นฐาน 3', grade: 'ป.3' },
+                { period: 3, subject: 'อังกฤษพื้นฐาน', grade: 'ม.1' },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: 'อังกฤษพื้นฐาน', grade: 'ม.3' },
+                { period: 6, subject: null, grade: null }
+              ]
+            }
+          },
+          {
+            name: 'ครูอรุณลักษณ์ การกระสัง',
+            type: 'tutor',
+            canTeachGrades: ['ป.1', 'ป.2', 'ป.3', 'ป.4', 'ป.5', 'ป.6'],
+            canTeachSpecial: null,
+            schedule: {
+              'วันจันทร์': [
+                { period: 1, subject: 'อังกฤษพื้นฐาน 1', grade: 'ป.1' },
+                { period: 2, subject: 'อังกฤษพื้นฐาน 4', grade: 'ป.4' },
+                { period: 3, subject: 'อังกฤษเพิ่มเติม 6', grade: 'ป.6' },
+                { period: 4, subject: 'อังกฤษพื้นฐาน 2', grade: 'ป.2' },
+                { period: 5, subject: 'อังกฤษเพิ่มเติม 5', grade: 'ป.5' },
+                { period: 6, subject: null, grade: null }
+              ],
+              'วันอังคาร': [
+                { period: 1, subject: 'อังกฤษพื้นฐาน 2', grade: 'ป.2' },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: 'อังกฤษพื้นฐาน 6', grade: 'ป.6' },
+                { period: 4, subject: 'อังกฤษเพิ่มเติม 1', grade: 'ป.1' },
+                { period: 5, subject: 'วิทยาการคำนวณ 4', grade: 'ป.4' },
+                { period: 6, subject: null, grade: null }
+              ],
+              'วันพุธ': [
+                { period: 1, subject: 'อังกฤษพื้นฐาน 1', grade: 'ป.1' },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: 'อังกฤษพื้นฐาน 6', grade: 'ป.6' },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: 'อังกฤษพื้นฐาน 2', grade: 'ป.2' },
+                { period: 6, subject: 'ลูกเสือ', grade: null }
+              ],
+              'วันพฤหัสบดี': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: 'อังกฤษพื้นฐาน 4', grade: 'ป.4' },
+                { period: 3, subject: 'อังกฤษพื้นฐาน 2', grade: 'ป.2' },
+                { period: 4, subject: 'อังกฤษพื้นฐาน 1', grade: 'ป.1' },
+                { period: 5, subject: 'ซ่อมเสริม', grade: 'ป.4' },
+                { period: 6, subject: 'ชุมนุม', grade: null }
+              ],
+              'วันศุกร์': [
+                { period: 1, subject: 'อังกฤษเพิ่มเติม 2', grade: 'ป.2' },
+                { period: 2, subject: 'อังกฤษเพิ่มเติม 4', grade: 'ป.4' },
+                { period: 3, subject: 'วางทุกงานอ่านทุกคน', grade: 'ป.6' },
+                { period: 4, subject: 'แนะแนว', grade: 'ป.4' },
+                { period: 5, subject: 'อังกฤษพื้นฐาน 1', grade: 'ป.1' },
+                { period: 6, subject: 'PLC', grade: null }
+              ]
+            }
+          },
+
+          // --- ครูทั่วไป ---
+          {
+            name: 'ครูวิภาวัลย์ นันท์มนัส',
+            type: 'general',
+            canTeachGrades: ['ป.1'],
+            canTeachSpecial: null,
+            schedule: {
+              'วันจันทร์': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: 'คณิตศาสตร์ 1', grade: 'ป.1' },
+                { period: 4, subject: 'แนะแนว', grade: 'ป.1' },
+                { period: 5, subject: 'ภาษาไทย 1', grade: 'ป.1' },
+                { period: 6, subject: 'วางทุกงานอ่านทุกคน', grade: 'ป.1' }
+              ],
+              'วันอังคาร': [
+                { period: 1, subject: 'คณิตศาสตร์ 1', grade: 'ป.1' },
+                { period: 2, subject: 'วิทยาศาสตร์และเทคฯ 1', grade: 'ป.1' },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: 'วางทุกงานอ่านทุกคน', grade: 'ป.1' },
+                { period: 6, subject: 'ภาษาไทย 1', grade: 'ป.1' }
+              ],
+              'วันพุธ': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: 'คณิตศาสตร์ 1', grade: 'ป.1' },
+                { period: 3, subject: 'ภาษาไทย 1', grade: 'ป.1' },
+                { period: 4, subject: 'ซ่อมเสริม', grade: 'ป.1' },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'ลูกเสือ', grade: null }
+              ],
+              'วันพฤหัสบดี': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: 'ภาษาไทย 1', grade: 'ป.1' },
+                { period: 3, subject: 'คณิตศาสตร์ 1', grade: 'ป.1' },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: 'วิทยาการคำนวณ 1', grade: 'ป.1' },
+                { period: 6, subject: 'ชุมนุม', grade: null }
+              ],
+              'วันศุกร์': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: 'คณิตศาสตร์ 1', grade: 'ป.1' },
+                { period: 3, subject: 'ภาษาไทย 1', grade: 'ป.1' },
+                { period: 4, subject: 'ป้องกันการทุจริต 1', grade: 'ป.1' },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'PLC', grade: null }
+              ]
+            }
+          },
+          {
+            name: 'ครูวิภารักษ์ อักโข',
+            type: 'general',
+            canTeachGrades: ['ป.2'],
+            canTeachSpecial: null,
+            schedule: {
+              'วันจันทร์': [
+                { period: 1, subject: 'คณิตศาสตร์ 2', grade: 'ป.2' },
+                { period: 2, subject: 'ภาษาไทย 2', grade: 'ป.2' },
+                { period: 3, subject: 'วิทยาศาสตร์และเทคฯ 2', grade: 'ป.2' },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: 'แนะแนว', grade: 'ป.2' },
+                { period: 6, subject: 'วิทยาการคำนวณ 2', grade: 'ป.2' }
+              ],
+              'วันอังคาร': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: 'คณิตศาสตร์ 2', grade: 'ป.2' },
+                { period: 3, subject: 'ภาษาไทย 2', grade: 'ป.2' },
+                { period: 4, subject: 'ซ่อมเสริม', grade: 'ป.2' },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'วางทุกงานอ่านทุกคน', grade: 'ป.2' }
+              ],
+              'วันพุธ': [
+                { period: 1, subject: 'ภาษาไทย 2', grade: 'ป.2' },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: 'คณิตศาสตร์ 2', grade: 'ป.2' },
+                { period: 4, subject: 'วางทุกงานอ่านทุกคน', grade: 'ป.2' },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'ลูกเสือ', grade: null }
+              ],
+              'วันพฤหัสบดี': [
+                { period: 1, subject: 'คณิตศาสตร์ 2', grade: 'ป.2' },
+                { period: 2, subject: 'ภาษาไทย 2', grade: 'ป.2' },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'ชุมนุม', grade: null }
+              ],
+              'วันศุกร์': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: 'คณิตศาสตร์ 2', grade: 'ป.2' },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: 'ป้องกันการทุจริต 2', grade: 'ป.2' },
+                { period: 5, subject: 'ภาษาไทย 2', grade: 'ป.2' },
+                { period: 6, subject: 'PLC', grade: null }
+              ]
+            }
+          },
+          {
+            name: 'ครูวิไลพร ดอกแก้ว',
+            type: 'general',
+            canTeachGrades: ['ป.3'],
+            canTeachSpecial: null,
+            schedule: {
+              'วันจันทร์': [
+                { period: 1, subject: 'แนะแนว', grade: 'ป.3' },
+                { period: 2, subject: 'คณิตศาสตร์ 3', grade: 'ป.3' },
+                { period: 3, subject: 'ภาษาไทย 3', grade: 'ป.3' },
+                { period: 4, subject: 'วิทยาศาสตร์และเทคฯ 3', grade: 'ป.3' },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: null, grade: null }
+              ],
+              'วันอังคาร': [
+                { period: 1, subject: 'ภาษาไทย 3', grade: 'ป.3' },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: 'คณิตศาสตร์ 3', grade: 'ป.3' },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: 'วางทุกงานอ่านทุกคน', grade: 'ป.3' },
+                { period: 6, subject: 'ซ่อมเสริม', grade: 'ป.3' }
+              ],
+              'วันพุธ': [
+                { period: 1, subject: 'คณิตศาสตร์ 3', grade: 'ป.3' },
+                { period: 2, subject: 'ภาษาไทย 3', grade: 'ป.3' },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: 'วิทยาการคำนวณ 3', grade: 'ป.3' },
+                { period: 6, subject: 'ลูกเสือ', grade: null }
+              ],
+              'วันพฤหัสบดี': [
+                { period: 1, subject: 'ภาษาไทย 3', grade: 'ป.3' },
+                { period: 2, subject: 'คณิตศาสตร์ 3', grade: 'ป.3' },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: 'วางทุกงานอ่านทุกคน', grade: 'ป.3' },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'ชุมนุม', grade: null }
+              ],
+              'วันศุกร์': [
+                { period: 1, subject: 'ภาษาไทย 3', grade: 'ป.3' },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: 'คณิตศาสตร์ 3', grade: 'ป.3' },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: 'ป้องการทุจริต 3', grade: 'ป.3' },
+                { period: 6, subject: 'PLC', grade: null }
+              ]
+            }
+          },
+          {
+            name: 'ครูพจนาจ หวลระลึก',
+            type: 'general',
+            canTeachGrades: ['ป.1', 'ป.2', 'ป.3', 'ป.4', 'ป.5', 'ป.6'],
+            canTeachSpecial: null,
+            schedule: {
+              'วันจันทร์': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: 'ศิลปะ (ดนตรี) 6', grade: 'ป.6' },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'ศิลปะ 3', grade: 'ป.3' }
+              ],
+              'วันอังคาร': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: 'การงานอาชีพ 1', grade: 'ป.1' },
+                { period: 4, subject: 'ประวัติศาสตร์ 3', grade: 'ป.3' },
+                { period: 5, subject: 'การงานอาชีพ 2', grade: 'ป.2' },
+                { period: 6, subject: 'ศิลปะ (ดนตรี) 5', grade: 'ป.5' }
+              ],
+              'วันพุธ': [
+                { period: 1, subject: 'ศิลปะ (ดนตรี) 4', grade: 'ป.4' },
+                { period: 2, subject: 'ศิลปะ (ทัศนศิลป์) 5', grade: 'ป.5' },
+                { period: 3, subject: 'สังคมศึกษาฯ 3', grade: 'ป.3' },
+                { period: 4, subject: 'ศิลปะ (ทัศนศิลป์) 4', grade: 'ป.4' },
+                { period: 5, subject: 'ศิลปะ 1', grade: 'ป.1' },
+                { period: 6, subject: 'ลูกเสือ', grade: null }
+              ],
+              'วันพฤหัสบดี': [
+                { period: 1, subject: 'สุขศึกษาและพลศึกษา 1', grade: 'ป.1' },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: 'สุขศึกษาและพลศึกษา 3', grade: 'ป.3' },
+                { period: 4, subject: 'สุขศึกษาและพลศึกษา 2', grade: 'ป.2' },
+                { period: 5, subject: 'ศิลปะ 2', grade: 'ป.2' },
+                { period: 6, subject: 'ชุมนุม', grade: null }
+              ],
+              'วันศุกร์': [
+                { period: 1, subject: 'สังคมศึกษาฯ 1', grade: 'ป.1' },
+                { period: 2, subject: 'ศิลปะ (ทัศนศิลป์) 6', grade: 'ป.6' },
+                { period: 3, subject: 'สังคมศึกษาฯ 2', grade: 'ป.2' },
+                { period: 4, subject: 'การงานอาชีพ 3', grade: 'ป.3' },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'PLC', grade: null }
+              ]
+            }
+          },
+          {
+            name: 'ครูวิไลวรรณ ทองคำ',
+            type: 'general',
+            canTeachGrades: ['ป.1', 'ป.2', 'ป.3', 'ป.4', 'ป.5', 'ป.6'],
+            canTeachSpecial: null,
+            schedule: {
+              'วันจันทร์': [
+                { period: 1, subject: 'สังคมศึกษาฯ 5', grade: 'ป.5' },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: 'ภาษาไทย 5', grade: 'ป.5' },
+                { period: 4, subject: 'ภาษาไทย 4', grade: 'ป.4' },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'ประวัติศาสตร์ 6', grade: 'ป.6' }
+              ],
+              'วันอังคาร': [
+                { period: 1, subject: 'ภาษาไทย 5', grade: 'ป.5' },
+                { period: 2, subject: 'ประวัติศาสตร์ 4', grade: 'ป.4' },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: 'สังคมศึกษาฯ 6', grade: 'ป.6' },
+                { period: 5, subject: 'ป้องกันการทุจริต 5', grade: 'ป.5' },
+                { period: 6, subject: 'สังคมศึกษาฯ 4', grade: 'ป.4' }
+              ],
+              'วันพุธ': [
+                { period: 1, subject: 'ภาษาไทย 5', grade: 'ป.5' },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: 'ภาษาไทย 4', grade: 'ป.4' },
+                { period: 4, subject: 'สังคมศึกษาฯ 5', grade: 'ป.5' },
+                { period: 5, subject: 'ป้องกันการทุจริต 4', grade: 'ป.4' },
+                { period: 6, subject: 'ลูกเสือ', grade: null }
+              ],
+              'วันพฤหัสบดี': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: 'สังคมศึกษาฯ 6', grade: 'ป.6' },
+                { period: 3, subject: 'ภาษาไทย 4', grade: 'ป.4' },
+                { period: 4, subject: 'วิทยาการคำนวณ 5', grade: 'ป.5' },
+                { period: 5, subject: 'ป้องกันการทุจริต 6', grade: 'ป.6' },
+                { period: 6, subject: 'ชุมนุม', grade: null }
+              ],
+              'วันศุกร์': [
+                { period: 1, subject: 'สังคมศึกษาฯ 4', grade: 'ป.4' },
+                { period: 2, subject: 'ภาษาไทย 5', grade: 'ป.5' },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: 'ประวัติศาสตร์ 5', grade: 'ป.5' },
+                { period: 5, subject: 'ภาษาไทย 4', grade: 'ป.4' },
+                { period: 6, subject: 'PLC', grade: null }
+              ]
+            }
+          },
+          {
+            name: 'ครูบรรจง หวังทรัพย์',
+            type: 'general',
+            canTeachGrades: ['ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3'],
+            canTeachSpecial: null,
+            schedule: {
+              'วันจันทร์': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: 'ประวัติศาสตร์ 1', grade: 'ป.1' },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: 'การงานอาชีพ (เพิ่มเติม)', grade: 'ม.3' },
+                { period: 5, subject: 'การงานอาชีพ 4', grade: 'ป.4' },
+                { period: 6, subject: 'การงานอาชีพ', grade: 'ม.2' }
+              ],
+              'วันอังคาร': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: 'การงานอาชีพ 6', grade: 'ป.6' },
+                { period: 3, subject: 'การงานอาชีพ', grade: 'ม.2' },
+                { period: 4, subject: 'การงานอาชีพ 5', grade: 'ป.5' },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'การงานอาชีพ', grade: 'ม.3' }
+              ],
+              'วันพุธ': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: 'ประวัติศาสตร์ 2', grade: 'ป.2' },
+                { period: 3, subject: 'การงานอาชีพ', grade: 'ม.1' },
+                { period: 4, subject: 'การงานอาชีพ', grade: 'ม.3' },
+                { period: 5, subject: 'การงานอาชีพ 5', grade: 'ป.5' },
+                { period: 6, subject: 'ลูกเสือ', grade: null }
+              ],
+              'วันพฤหัสบดี': [
+                { period: 1, subject: 'การงานอาชีพ 4', grade: 'ป.4' },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: 'พลศึกษา', grade: 'ม.1' },
+                { period: 4, subject: 'พลศึกษา', grade: 'ม.3' },
+                { period: 5, subject: 'พลศึกษา', grade: 'ม.2' },
+                { period: 6, subject: 'ชุมนุม', grade: null }
+              ],
+              'วันศุกร์': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: 'การงานอาชีพ', grade: 'ม.1' },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: 'การงานอาชีพ 6', grade: 'ป.6' },
+                { period: 5, subject: 'การงานอาชีพ (เพิ่มเติม)', grade: 'ม.2' },
+                { period: 6, subject: 'การงานอาชีพ (เพิ่มเติม)', grade: 'ม.1' }
+              ]
+            }
+          },
+          {
+            name: 'ครูเอกพจน์ หัวเขา',
+            type: 'general',
+            canTeachGrades: ['ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3'],
+            canTeachSpecial: null,
+            schedule: {
+              'วันจันทร์': [
+                { period: 1, subject: 'สังคมศึกษาฯ', grade: 'ม.3' },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: 'สังคมศึกษาฯ', grade: 'ม.1' },
+                { period: 6, subject: 'ป้องกันการทุจริต', grade: 'ม.3' }
+              ],
+              'วันอังคาร': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: 'สังคมศึกษาฯ', grade: 'ม.3' },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'สังคมศึกษาฯ', grade: 'ม.2' }
+              ],
+              'วันพุธ': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: 'สังคมศึกษาฯ', grade: 'ม.2' },
+                { period: 4, subject: 'ป้องกันการทุจริต', grade: 'ม.2' },
+                { period: 5, subject: 'สังคมศึกษาฯ', grade: 'ม.1' },
+                { period: 6, subject: 'ลูกเสือ', grade: null }
+              ],
+              'วันพฤหัสบดี': [
+                { period: 1, subject: 'ประวัติศาสตร์', grade: 'ม.1' },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: 'ประวัติศาสตร์', grade: 'ม.2' },
+                { period: 5, subject: 'ประวัติศาสตร์', grade: 'ม.3' },
+                { period: 6, subject: 'ชุมนุม', grade: null }
+              ],
+              'วันศุกร์': [
+                { period: 1, subject: 'สังคมศึกษาฯ', grade: 'ม.3' },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: 'สังคมศึกษาฯ', grade: 'ม.2' },
+                { period: 4, subject: 'สังคมศึกษาฯ', grade: 'ม.1' },
+                { period: 5, subject: 'ป้องกันการทุจริต', grade: 'ม.1' },
+                { period: 6, subject: 'แนะแนว', grade: 'ม.2' }
+              ]
+            }
+          },
+          {
+            name: 'ครูกฤติยา ศรีเพชร',
+            type: 'general',
+            canTeachGrades: ['ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3'],
+            canTeachSpecial: null,
+            schedule: {
+              'วันจันทร์': [
+                { period: 1, subject: 'คณิตศาสตร์ 4', grade: 'ป.4' },
+                { period: 2, subject: 'คณิตศาสตร์ 5', grade: 'ป.5' },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'วางทุกงานอ่านทุกคน', grade: 'ป.4' }
+              ],
+              'วันอังคาร': [
+                { period: 1, subject: 'สุขศึกษา', grade: 'ม.3' },
+                { period: 2, subject: 'คณิตศาสตร์ 5', grade: 'ป.5' },
+                { period: 3, subject: 'คณิตศาสตร์ 4', grade: 'ป.4' },
+                { period: 4, subject: 'วางทุกงานอ่านทุกคน', grade: 'ป.4' },
+                { period: 5, subject: 'วิทยาการคำนวณ', grade: 'ม.2' },
+                { period: 6, subject: 'สุขศึกษา', grade: 'ม.1' }
+              ],
+              'วันพุธ': [
+                { period: 1, subject: 'สุขศึกษา', grade: 'ม.2' },
+                { period: 2, subject: 'คณิตศาสตร์ 4', grade: 'ป.4' },
+                { period: 3, subject: 'คณิตศาสตร์ 5', grade: 'ป.5' },
+                { period: 4, subject: 'ซ่อมเสริม', grade: 'ป.6' },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'ลูกเสือ', grade: null }
+              ],
+              'วันพฤหัสบดี': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: 'คณิตศาสตร์ 5', grade: 'ป.5' },
+                { period: 3, subject: 'สุขศึกษาและพลศึกษา 6', grade: 'ป.6' },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'ชุมนุม', grade: null }
+              ],
+              'วันศุกร์': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: 'คณิตศาสตร์ 4', grade: 'ป.4' },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: 'แนะแนว', grade: 'ป.5' },
+                { period: 6, subject: null, grade: null }
+              ]
+            }
+          },
+          {
+            name: 'ครูคีร่า โอคอนเนล',
+            type: 'general',
+            canTeachGrades: [], // สอนเฉพาะอังกฤษ
+            canTeachSpecial: { subject: 'อังกฤษ', grades: ['ป.1', 'ป.2', 'ป.3', 'ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3'] },
+            schedule: {
+              'วันจันทร์': [
+                { period: 1, subject: 'อังกฤษพื้นฐาน', grade: 'ม.2' },
+                { period: 2, subject: 'อังกฤษพื้นฐาน 4', grade: 'ป.4' },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: 'อังกฤษพื้นฐาน 2', grade: 'ป.2' },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: null, grade: null }
+              ],
+              'วันอังคาร': [
+                { period: 1, subject: 'อังกฤษพื้นฐาน', grade: 'ม.1' },
+                { period: 2, subject: 'อังกฤษพื้นฐาน 3', grade: 'ป.3' },
+                { period: 3, subject: 'อังกฤษพื้นฐาน 6', grade: 'ป.6' },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: null, grade: null }
+              ],
+              'วันพุธ': [
+                { period: 1, subject: 'อังกฤษพื้นฐาน 1', grade: 'ป.1' },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: 'อังกฤษพื้นฐาน 6', grade: 'ป.6' },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: 'อังกฤษพื้นฐาน 2', grade: 'ป.2' },
+                { period: 6, subject: 'ลูกเสือ', grade: null }
+              ],
+              'วันพฤหัสบดี': [
+                { period: 1, subject: 'อังกฤษพื้นฐาน 5', grade: 'ป.5' },
+                { period: 2, subject: 'อังกฤษพื้นฐาน 4', grade: 'ป.4' },
+                { period: 3, subject: 'อังกฤษพื้นฐาน', grade: 'ม.3' },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'ชุมนุม', grade: null }
+              ],
+              'วันศุกร์': [
+                { period: 1, subject: 'อังกฤษพื้นฐาน 5', grade: 'ป.5' },
+                { period: 2, subject: 'อังกฤษพื้นฐาน 3', grade: 'ป.3' },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: 'อังกฤษพื้นฐาน 1', grade: 'ป.1' },
+                { period: 6, subject: 'PLC', grade: null }
+              ]
+            }
+          }
+        ];
+
+        // --- HELPER FUNCTIONS ---
+
+        const EXCLUDED_SUBJECTS = ['ลูกเสือ', 'ชุมนุม', 'PLC'];
+        const TUTORING_GRADES = ['ป.6', 'ม.3'];
+
+        function formatDateToKey(dateString) {
+          if (!dateString) return null;
+          const [year, month, day] = dateString.split('-');
+          const buddhistYear = parseInt(year) + 543;
+          return `${day}/${month}/${buddhistYear}`;
         }
 
-        function formatFullThaiDate(date) {
-            if (!date) return "";
-            return date.toLocaleDateString('th-TH', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                numberingSystem: 'latn',
-                calendar: 'buddhist',
-                timeZone: 'UTC'
-            });
-        }
-        // --- END: Date Helper Functions ---
-
-        // --- START: File Handling and UI Update ---
-        // This function populates the date dropdown. It can be called by file upload or link input.
-        async function populateDateDropdown(textProvider) {
-            dateInput.innerHTML = '<option value="">กำลังโหลดวันที่...</option>';
-            dateInput.disabled = true;
-            
-            try {
-                const onetScheduleText = await textProvider();
-                const dateRegex = /(\d{2}\/\d{2}\/\d{4})/g;
-                const matches = onetScheduleText.match(dateRegex);
-                
-                if (matches && matches.length > 0) {
-                    const uniqueDates = [...new Set(matches)];
-                    const sortedDates = uniqueDates.sort((a, b) => {
-                        const dateA = parseDateBE(a);
-                        const dateB = parseDateBE(b);
-                        if (!dateA) return 1;
-                        if (!dateB) return -1;
-                        return dateA - dateB;
-                    });
-
-                    dateInput.innerHTML = ''; // Clear
-                    sortedDates.forEach(dateStr => {
-                        const option = document.createElement('option');
-                        option.value = dateStr;
-                        const dateObj = parseDateBE(dateStr);
-                        option.textContent = formatFullThaiDate(dateObj) || dateStr;
-                        dateInput.appendChild(option);
-                    });
-                    dateInput.disabled = false;
-                } else {
-                    dateInput.innerHTML = '<option value="">ไม่พบวันที่ในข้อมูล</option>';
-                    dateInput.disabled = true;
-                }
-            } catch (error) {
-                console.error("Error populating dates:", error);
-                errorMessage.textContent = 'ไม่สามารถดึงวันที่จากข้อมูลได้: ' + error.message;
-                dateInput.innerHTML = '<option value="">เกิดข้อผิดพลาด</option>';
-                dateInput.disabled = true;
-            }
+        function getDayOfWeek(dateKey) {
+          if (!dateKey) return null;
+          const [day, month, year] = dateKey.split('/');
+          const gregorianYear = parseInt(year) - 543;
+          const date = new Date(`${gregorianYear}-${month}-${day}`);
+          const dayIndex = date.getDay();
+          const days = ['วันอาทิตย์', 'วันจันทร์', 'วันอังคาร', 'วันพุธ', 'วันพฤหัสบดี', 'วันศุกร์', 'วันเสาร์'];
+          return days[dayIndex];
         }
 
-        // File upload event
-        onetScheduleInput.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (file) {
-                onetFilename.textContent = `ไฟล์ที่เลือก: ${file.name}`;
-                onetLinkInput.value = ''; // Clear link input
-                // Create a text provider function for the file
-                const textProvider = () => {
-                    const extractOnetText = file.type === 'application/pdf' ? extractTextFromPdfFile : extractTextFromTxtFile;
-                    return extractOnetText(file);
-                };
-                populateDateDropdown(textProvider);
-            }
-        });
-        
-        // Link input event (on blur, i.e., when user clicks away)
-        onetLinkInput.addEventListener('blur', () => {
-            const url = onetLinkInput.value.trim();
-            if (url) {
-                onetFilename.textContent = `ใช้ลิงก์: ${url.substring(0, 50)}...`;
-                onetScheduleInput.value = ''; // Clear file input
-                // Create a text provider function for the URL
-                const textProvider = () => fetchDataFromUrl(url);
-                populateDateDropdown(textProvider);
-            }
-        });
+        function canTeacherSubstitute(teacher, targetGrade, targetSubject) {
+            if (!targetGrade) return true;
 
-        teacherScheduleInput.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (file) {
-                teacherFilename.textContent = `ไฟล์ที่เลือก: ${file.name}`;
-                teacherLinkInput.value = ''; // Clear link input
-            }
-        });
-
-        teacherLinkInput.addEventListener('blur', () => {
-             const url = teacherLinkInput.value.trim();
-            if (url) {
-                teacherFilename.textContent = `ใช้ลิงก์: ${url.substring(0, 50)}...`;
-                teacherScheduleInput.value = ''; // Clear file input
-            }
-        });
-        // --- END: File Handling and UI Update ---
-
-        // --- START: Toggle Visibility Logic ---
-        toggleDetailsInput.addEventListener('change', () => {
-            if (toggleDetailsInput.checked) {
-                resultsContainer.classList.add('show-subs-only');
-            } else {
-                resultsContainer.classList.remove('show-subs-only');
-            }
-        });
-        // --- END: Toggle Visibility Logic ---
-
-        // --- START: Export JPG Logic ---
-        exportJpgButton.addEventListener('click', () => {
-            const targetElement = document.getElementById('results-output');
-            const dateValue = dateInput.value.trim().replace(/\//g, '-') || 'schedule';
-            const filename = `ตารางสอนแทน-${dateValue}.jpg`;
-
-            if (!targetElement || targetElement.innerHTML.trim() === "") {
-                errorMessage.textContent = 'ไม่มีข้อมูลสำหรับ Export';
-                return;
-            }
-
-            exportJpgButton.disabled = true;
-            exportButtonText.textContent = 'กำลัง Export...';
-            errorMessage.textContent = ''; 
-
-            html2canvas(targetElement, {
-                scale: 2, 
-                useCORS: true,
-                backgroundColor: '#ffffff' // Ensure white background for JPG
-            }).then(canvas => {
-                const imageData = canvas.toDataURL('image/jpeg', 0.95); // Use JPEG format
-                const link = document.createElement('a');
-                link.href = imageData;
-                link.download = filename;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            }).catch(err => {
-                console.error("Export Error:", err);
-                errorMessage.textContent = 'เกิดข้อผิดพลาดในการ Export รูปภาพ';
-            }).finally(() => {
-                exportJpgButton.disabled = false;
-                exportButtonText.textContent = 'Export รูปภาพ';
-            });
-        });
-        // --- END: Export JPG Logic ---
-
-        // --- START: Text Extraction Functions ---
-        
-        // NEW: Handles ArrayBuffer (from file OR fetch)
-        async function extractTextFromPdfData(arrayBuffer) {
-            try {
-                // START MOD: Added safety check for PDF header
-                const firstBytes = new Uint8Array(arrayBuffer.slice(0, 5));
-                const header = String.fromCharCode.apply(null, firstBytes);
-                if (!header.startsWith('%PDF-')) {
-                    console.warn("Data does not start with PDF header, attempting parse anyway...");
-                    // Optionally throw error immediately: throw new Error('Invalid PDF structure (header mismatch)');
-                }
-                // END MOD
-                
-                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-                let textContent = '';
-                for (let i = 1; i <= pdf.numPages; i++) {
-                    const page = await pdf.getPage(i);
-                    const text = await page.getTextContent();
-                    textContent += text.items.map(s => s.str).join(' ');
-                }
-                return textContent;
-            } catch (error) {
-                console.error("PDF Parsing Error:", error);
-                // Propagate a clearer error message
-                throw new Error('ไม่สามารถอ่านข้อมูล PDF ได้: ' + (error.message || 'โครงสร้างไฟล์ไม่ถูกต้อง'));
-            }
-        }
-        
-        // MOD: Reads file into ArrayBuffer, then calls new function
-        async function extractTextFromPdfFile(file) {
-            const reader = new FileReader();
-            return new Promise((resolve, reject) => {
-                reader.onload = async (event) => {
-                    try {
-                        const text = await extractTextFromPdfData(event.target.result);
-                        resolve(text);
-                    } catch (error) {
-                        reject(error); // Reject with the error from extractTextFromPdfData
+            // Handle special subject teacher (e.g., English only)
+            if (teacher.canTeachSpecial) {
+                const { subject, grades } = teacher.canTeachSpecial;
+                // Use includes for broader subject matching (e.g., "อังกฤษพื้นฐาน" includes "อังกฤษ")
+                if (targetSubject.toLowerCase().includes(subject.toLowerCase())) {
+                    if (grades.includes(targetGrade)) {
+                        return true;
                     }
-                };
-                reader.onerror = (error) => {
-                     console.error("File Reading Error (PDF):", error);
-                     reject('เกิดข้อผิดพลาดในการอ่านไฟล์ PDF: ' + (error.message || error));
                 }
-                reader.readAsArrayBuffer(file);
-            });
+            }
+
+            // Handle general grade teacher
+            if (teacher.canTeachGrades.includes(targetGrade)) {
+                return true;
+            }
+
+            // If subject-specific and didn't match, or general and didn't match
+            return false;
         }
 
-        async function extractTextFromTxtFile(file) {
-            const reader = new FileReader();
-            return new Promise((resolve, reject) => {
-                reader.onload = (event) => {
-                    resolve(event.target.result);
-                };
-                reader.onerror = (error) => {
-                    console.error("File Reading Error (TXT):", error);
-                    reject('เกิดข้อผิดพลาดในการอ่านไฟล์ TXT: ' + (error.message || error));
-                }
-                reader.readAsText(file, 'UTF-8');
-            });
-        }
-        
-        // --- START NEW: Data Fetching from URL ---
-        function getGoogleDriveDirectLink(url) {
-            try {
-                // Regex to find Google Drive file ID
-                const fileIdMatch = url.match(/d\/(.+?)\//);
-                if (fileIdMatch && fileIdMatch[1]) {
-                    const fileId = fileIdMatch[1];
-                    // Return direct download link
-                    return `https://docs.google.com/uc?export=download&id=${fileId}`;
-                }
-                 // Try another common GDrive format (sharing link)
-                const shareIdMatch = url.match(/id=([a-zA-Z0-9_-]+)/);
-                if (shareIdMatch && shareIdMatch[1]) {
-                    return `https://docs.google.com/uc?export=download&id=${shareIdMatch[1]}`;
-                }
-            } catch (e) {
-                console.warn("Could not parse Google Drive URL, using original.", e);
+
+        function isGradeTutoring(grade, period, onetDaySchedule) {
+          // Checks if a specific grade is in O-NET tutoring at a specific period
+          if (!TUTORING_GRADES.includes(grade) || !onetDaySchedule) {
+            return false;
+          }
+          for (const session of onetDaySchedule) {
+            if (session.grade === grade && session.periods.includes(period)) {
+              return true;
             }
-            // If not a recognized GDrive link, return original URL
-            return url;
+          }
+          return false;
         }
 
-        async function fetchDataFromUrl(url) {
-            if (!url) throw new Error("URL is empty");
-            console.log("Fetching data from URL:", url);
-
-            let fetchUrl = url;
-            if (url.includes('drive.google.com')) {
-                fetchUrl = getGoogleDriveDirectLink(url);
-                console.log("Transformed Google Drive URL to:", fetchUrl);
+        function isTeacherTutoring(teacherName, period, onetDaySchedule) {
+            // Checks if a specific teacher is busy tutoring O-NET at a specific period
+            if (!onetDaySchedule) {
+                return false;
             }
-
-            // Using a CORS proxy to bypass security restrictions
-            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(fetchUrl)}`;
-            let response;
-            
-            try {
-                response = await fetch(proxyUrl);
-                if (!response.ok) {
-                     // Try fetching directly if proxy fails (might work for some direct links)
-                     console.warn(`Proxy fetch failed (${response.status}), trying direct fetch...`);
-                     const directResponse = await fetch(fetchUrl);
-                     if (!directResponse.ok) {
-                         throw new Error(`Direct fetch also failed: ${directResponse.status} ${directResponse.statusText}`);
-                     }
-                     // Use direct response if successful
-                     response = directResponse; // Overwrite response with the successful one
+            for (const session of onetDaySchedule) {
+                if (session.teacher === teacherName && session.periods.includes(period)) {
+                    return true;
                 }
-                 // Process the successful response (either from proxy or direct)
-                 return processResponse(response, url); // Removed fetchUrl as it's less reliable
-
-            } catch (error) {
-                console.error("FetchDataFromUrl Error:", error);
-                throw new Error(`ไม่สามารถดึงข้อมูลจากลิงก์ได้ (อาจเกิดปัญหา CORS หรือลิงก์ไม่ถูกต้อง): ${error.message}`);
             }
+            return false;
         }
 
-        // Helper function to process the fetch response
-        // START MOD: Added internal PDF check
-        async function processResponse(response, originalUrl) {
-            // Clone the response to read it twice (once for check, once for actual data)
-            const clonedResponse = response.clone();
-            const arrayBuffer = await response.arrayBuffer();
+        // --- CORE SUBSTITUTION LOGIC ---
 
-            // Check first few bytes for PDF magic number
-            const firstBytes = new Uint8Array(arrayBuffer.slice(0, 5));
-            const header = String.fromCharCode.apply(null, firstBytes);
+        function generateSubstituteSchedule(dateKey) {
+            const onetDaySchedule = onetData[dateKey];
+            const dayOfWeek = getDayOfWeek(dateKey);
 
-            if (header.startsWith('%PDF-')) {
-                console.log("Treating as PDF based on content header...");
-                // Use the already fetched arrayBuffer
-                return await extractTextFromPdfData(arrayBuffer);
-            } else {
-                 console.log("Content doesn't start with PDF header, treating as TXT...");
-                 // Read the cloned response as text
-                 return await clonedResponse.text();
-            }
-        }
-        // END MOD
-        // --- END NEW: Data Fetching from URL ---
-        
-        // --- END: Text Extraction Functions ---
-
-        // --- START: UI State Management ---
-        function setUIState(isLoading, message = '') {
-            analyzeButton.disabled = isLoading;
-            errorMessage.textContent = message;
-            if (isLoading) {
-                spinner.classList.remove('hidden');
-                buttonIcon.classList.add('hidden');
-                buttonText.textContent = 'กำลังวิเคราะห์...';
-                resultsContainer.classList.add('hidden');
-            } else {
-                spinner.classList.add('hidden');
-                buttonIcon.classList.remove('hidden');
-                buttonText.textContent = 'วิเคราะห์และจัดตาราง';
-            }
-        }
-        // --- END: UI State Management ---
-
-        // --- START: Main Analysis Logic ---
-        analyzeButton.addEventListener('click', async () => {
-            setUIState(true);
-            resultsOutput.innerHTML = "";
-            
-            const dateStringForApi = dateInput.value.trim();
-            if (!dateStringForApi) {
-                setUIState(false, 'กรุณาเลือกวันที่');
-                return;
+            if (!onetDaySchedule || !dayOfWeek) {
+                return { schedule: [], fullDateText: '', dayOfWeekText: dayOfWeek || '' }; // No O-NET on this day
             }
 
-            try {
-                // --- START NEW: Data Source Logic ---
-                let onetScheduleText;
-                let teacherScheduleText;
-
-                // 1. Get O-NET Data
-                const onetUrl = onetLinkInput.value.trim();
-                const onetFile = onetScheduleInput.files[0];
-                
-                if (onetUrl) {
-                    onetScheduleText = await fetchDataFromUrl(onetUrl);
-                } else if (onetFile) {
-                    const extractOnetText = onetFile.type === 'application/pdf' ? extractTextFromPdfFile : extractTextFromTxtFile;
-                    onetScheduleText = await extractOnetText(onetFile);
-                } else {
-                    throw new Error('กรุณาใส่ลิงก์ หรืออัปโหลดตารางติว O-NET');
-                }
-
-                // 2. Get Teacher Data
-                const teacherUrl = teacherLinkInput.value.trim();
-                const teacherFile = teacherScheduleInput.files[0];
-
-                if (teacherUrl) {
-                    teacherScheduleText = await fetchDataFromUrl(teacherUrl);
-                } else if (teacherFile) {
-                    const extractTeacherText = teacherFile.type === 'application/pdf' ? extractTextFromPdfFile : extractTextFromTxtFile;
-                    teacherScheduleText = await extractTeacherText(teacherFile);
-                } else {
-                    throw new Error('กรุณาใส่ลิงก์ หรืออัปโหลดตารางสอนปกติ');
-                }
-                // --- END NEW: Data Source Logic ---
+             // Calculate fullDateText and dayOfWeekText here
+            const [day, monthIndex, year] = dateKey.split('/');
+            const thaiMonths = [
+                'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+                'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+            ];
+            const fullDateText = `วันที่ ${parseInt(day)} ${thaiMonths[parseInt(monthIndex) - 1]} ${year}`;
+            const dayOfWeekText = dayOfWeek;
 
 
-                // --- Date Formatting ---
-                const dateObj = parseDateBE(dateStringForApi);
-                if (!dateObj) {
-                    throw new Error("รูปแบบวันที่ไม่ถูกต้อง");
-                }
-                const fullThaiDate = formatFullThaiDate(dateObj);
-                    
-                // (THE PROMPT REMAINS UNCHANGED FROM THE PREVIOUS VERSION)
-                const finalPrompt = `
-                    คุณคือ AI จัดตารางสอนแทน วันที่ ${dateStringForApi} (ซึ่งคือ ${fullThaiDate}).
+            // 1. Initialize teacher workloads
+            const teacherWorkloads = {};
 
-                    **ข้อมูลสำคัญ:**
-                    ${teacherRoles}
-
-                    **เป้าหมาย:** สร้างตารางสอนแทนตามรูปแบบ HTML นี้เท่านั้น (ห้ามมี \`\`\`):
-                    <div class="date-heading">${fullThaiDate}</div>
-                    <div class="teacher-heading">สอนแทน ครู[ชื่อครู] (ติดติว O-NET [วิชา] [ชั้น] เวลา [HH:MM-HH:MM น.]):</div>
-                    <div class="substitution-line">- คาบ X: [ชั้น/วิชา] → <strong>ครู[ชื่อผู้สอนแทน]</strong> (เหตุผล: [ระบุเหตุผล])</div>
-                    <div class="no-substitution-line">- คาบ X: ... → ไม่มีคาบที่ต้องสอนแทน (เหตุผล: [ระบุเหตุผล])</div>
-
-                    **กระบวนการ (ทำตามเคร่งครัด):**
-                    1.  **หาครูติว 4 คน เวลาติว และชั้นที่ติว:** จากตารางติว, หาครู 4 คน, 'เวลาติวที่แน่นอน' (เช้า/บ่าย) และ 'ชั้นที่ติว' (ป.6/ม.3) ของวันที่ ${dateStringForApi}.
-                    
-                    2.  **หาคาบที่เกี่ยวข้อง (เฉพาะคาบที่ตรงเวลาติว):**
-                        * **กฎเหล็ก:** สำหรับครูที่ติวเช้า (08:30-11:30 น.), ให้วิเคราะห์ **เฉพาะคาบ 1, 2, 3** เท่านั้น. **ห้าม** วิเคราะห์หรือแสดงผลคาบ 4, 5, 6 ของครูคนนั้นเด็ดขาด.
-                        * **กฎเหล็ก:** สำหรับครูที่ติวบ่าย (12:30-15:30 น.), ให้วิเคราะห์ **เฉพาะคาบ 4, 5, 6** เท่านั้น. **ห้าม** วิเคราะห์หรือแสดงผลคาบ 1, 2, 3 ของครูคนนั้นเด็ดขาด.
-                        * **กฎยกเว้น (ห้ามจัดแทน):** ภายในคาบที่เกี่ยวข้อง (1-3 หรือ 4-6), ถ้าคาบนั้นเป็น **ป.6/ม.3** หรือกิจกรรม **ชุมนุม, ลูกเสือ, PLC**, ให้ระบุว่า "ไม่มีคาบที่ต้องสอนแทน (เหตุผล: คาบยกเว้น...)"
-                        * **กฎคาบว่าง:** ภายในคาบที่เกี่ยวข้อง (1-3 หรือ 4-6), ถ้าคาบนั้น **ไม่มีข้อความใดๆ หลังเครื่องหมาย :** (เป็นช่องว่าง), ให้ระบุว่า "ไม่มีคาบที่ต้องสอนแทน (เหตุผล: ครูมีคาบว่าง)"
-
-                    3.  **หาคนสอนแทน (ตามลำดับเคร่งครัด - เฉพาะคาบที่ไม่ถูกยกเว้น):**
-                        
-                        **!! กฎหลักในการค้นหา !!**
-                        **!! กฎเหล็กสูงสุด: ห้ามเลือกครูติว 4 คนที่กำลังติวในเวลานั้นๆ (เช่น ติวเช้า คาบ 1-3) มาเป็นผู้สอนแทนในคาบนั้นๆ เด็ดขาด ไม่ว่ากรณีใดๆ !!**
-
-                        * **นิยาม "ไม่ว่าง" (Busy):** ครูคนใดก็ตามที่...
-                            1.  มีสอนในคาบนั้น (วิชาที่ไม่ใช่ ป.6/ม.3 และไม่ใช่ช่องว่างเปล่า).
-                            2.  **หรือ** เป็นหนึ่งใน **'ครูติว'** 4 คนที่ต้องติว O-NET ใน **ช่วงเวลานั้นพอดี** (เช่น ติวเช้า คาบ 1-3).
-                        
-                        * **นิยาม "ว่าง-สลับคาบ" (Available-Swap):** ครูคนใดก็ตามที่...
-                            1.  **ไม่เข้าข่าย "ไม่ว่าง" (Busy)**
-                            2.  **และ** ตารางสอนปกติของครูในคาบนั้นเป็น **ป.6 หรือ ม.3** (ซึ่งนักเรียนไปติว).
-                            (ย้ำ: ต้องเป็นครูที่ "สอน" ป.6/ม.3 ในคาบนั้นจริงๆ ไม่ใช่ครูที่ "ว่าง" อยู่แล้ว)
-
-                        * **นิยาม "ว่าง-ตารางโล่ง" (Available-Empty):** ครูคนใดก็ตามที่...
-                            1.  **ไม่เข้าข่าย "ไม่ว่าง" (Busy)**
-                            2.  **และ** ตารางสอนปกติของครูในคาบนั้นเป็น **ช่องว่างเปล่า (ไม่มีข้อความหลัง :)** หรือมีข้อความว่า **"คาบว่าง"**.
-                            (ย้ำ: ต้องเป็นครูที่ "ว่าง" จริงๆ ในตาราง)
-                        
-                        **คำเตือน: ต้องทำตามลำดับ A -> B -> C -> D -> E -> F -> G -> H อย่างเคร่งครัด ห้ามข้ามลำดับ**
-
-                        * **ลำดับการหา:**
-                            **A. กฎเหล็ก (อันดับ 1 - ต้องตรวจสอบก่อนเสมอ):**
-                               **!! คำเตือน: นี่คือกฎสำคัญที่สุด ห้ามข้าม!!**
-                               1.  ตรวจสอบว่าคาบที่ต้องแทนเป็น ป.1, ป.2, หรือ ป.3 หรือไม่?
-                               2.  **ถ้าเป็น ป.1:** (บังคับทำ) ให้ตรวจสอบ 'ครูวิภาวัลย์' ก่อน. ถ้า 'ครูวิภาวัลย์' มีสถานะเป็น **"ว่าง-ตารางโล่ง"** ในคาบนั้น *ต้อง* ให้ครูวิภาวัลย์สอนแทน (เหตุผล: **กฎเฉพาะ ป.1**) และ **จบการค้นหา**. ถ้าไม่ว่าง (เช่น สอนอยู่ หรือเป็น Busy), ให้ไปทำต่อที่ข้อ B.
-                               3.  **ถ้าเป็น ป.2:** (บังคับทำ) ให้ตรวจสอบ 'ครูวิภารักษ์' ก่อน. ถ้า 'ครูวิภารักษ์' มีสถานะเป็น **"ว่าง-ตารางโล่ง"** ในคาบนั้น *ต้อง* ให้ครูวิภารักษ์สอนแทน (เหตุผล: **กฎเฉพาะ ป.2**) และ **จบการค้นหา**. ถ้าไม่ว่าง, ให้ไปทำต่อที่ข้อ B.
-                               4.  **ถ้าเป็น ป.3:** (บังคับทำ) ให้ตรวจสอบ 'ครูวิไลพร' ก่อน. ถ้า 'ครูวิไลพร' มีสถานะเป็น **"ว่าง-ตารางโล่ง"** ในคาบนั้น *ต้อง* ให้ครูวิไลพรสอนแทน (เหตุผล: **กฎเฉพาะ ป.3**) และ **จบการค้นหา**. ถ้าไม่ว่าง, ให้ไปทำต่อที่ข้อ B.
-                               5.  ถ้าไม่ใช่ ป.1-3, ให้ไปทำต่อที่ข้อ B.
-
-                            **B. กกฎสลับคาบ (ลำดับ 1 - ตรงชั้น):**
-                               ก. (ตรวจสอบต่อจาก A) **ระบุชั้นที่ครูติวกำลังติว** (เช่น ครูดำเนิน ติว **ม.3**).
-                               ข. **(บังคับทำ):** ให้ค้นหา 'ครู D' (ที่เป็น **'ครูทั่วไป'** และ**ไม่ใช่ครูติว**) ที่มีสถานะเป็น **"ว่าง-สลับคาบ"** **ซึ่งว่างเพราะสอนชั้นเดียวกับที่ครูติวกำลังติวพอดี** (เช่น ครูดำเนินติว **ม.3**, ก็ต้องหาครูที่ว่างเพราะสอน **ม.3**).
-                               ค. ถ้าเจอ 'ครู D' (ที่ว่างเพราะสอน ม.3) และเขาสอนคาบที่ต้องแทนได้ (เช่น สอน ม.2 ได้),
-                               ง. **(บังคับทำ):** *ต้อง* ให้ 'ครู D' สอนแทน (เหตุผล: **กฎสลับคาบ (นักเรียน ม.3 ติว)**) และ **จบการค้นหาสำหรับคาบนี้ทันที**.
-                               จ. ถ้าหาไม่เจอ (ไม่มีครูทั่วไปที่ว่างเพราะสอน ม.3), ให้ไปทำต่อที่ข้อ C.
-
-                            **C. กฎสลับคาบ (ลำดับ 2 - ข้ามชั้น):**
-                               ก. (ตรวจสอบต่อจาก B) **ระบุชั้นติวอีกระดับหนึ่ง** (เช่น ถ้าครูติวติว ม.3, ให้อีกระดับคือ **ป.6** / หรือถ้าติว ป.6, ให้อีกระดับคือ **ม.3**).
-                               ข. **(บังคับทำ):** ให้ค้นหา 'ครู E' (ที่เป็น **'ครูทั่วไป'** และ**ไม่ใช่ครูติว**) ที่มีสถานะเป็น **"ว่าง-สลับคาบ"** **ซึ่งว่างเพราะสอนชั้นอีกระดับนั้นพอดี** (เช่น ครูดำเนินติว ม.3, ให้หาครูที่ว่างเพราะสอน **ป.6**).
-                               ค. ถ้าเจอ 'ครู E' (ที่ว่างเพราะสอน ป.6) และเขาสอนคาบที่ต้องแทนได้,
-                               ง. **(บังคับทำ):** ให้ 'ครู E' สอนแทน (เหตุผล: **กฎสลับคาบ (นักเรียน ป.6 ติว)**) และ **จบการค้นหาสำหรับคาบนี้ทันที**.
-                               จ. ถ้าหาไม่เจอ (ไม่มีครูทั่วไปที่ว่างเพราะสอน ป.6), ให้ไปทำต่อที่ข้อ D.
-
-                            **D. กฎทั่วไป (ว่างเปล่า, ไม่เกิน 5 คาบ - อันดับ 4):**
-                               ก. (ตรวจสอบต่อจาก C) ให้หา 'ครูทั่วไป' ที่มีสถานะเป็น **"ว่าง-ตารางโล่ง"** (ตารางเป็นช่องว่าง) + สอนชั้นนั้นได้ + สอนรวมไม่เกิน 5 คาบ.
-                               ข. ถ้าเจอ (เช่น ครูเอกพจน์ คาบ 1), ให้สอนแทน (เหตุผล: **กฎทั่วไป - ครูว่าง**) และ **จบการค้นหา**. ถ้าไม่เจอ, ไป 'ลำดับ E'.
-
-                            **E. กฎอังกฤษ (ว่างเปล่า, ไม่เกิน 5 คาบ - อันดับ 5):**
-                               ก. (ตรวจสอบต่อจาก D) ถ้าเป็นวิชาอังกฤษ, หา 'ครูคีร่า' ที่มีสถานะเป็น **"ว่าง-ตารางโล่ง"** + สอนได้ + ไม่เกิน 5 คาบ.
-                               ข. ถ้าเจอ, ให้สอนแทน (เหตุผล: **กฎอังกฤษ - ครูว่าง**) และ **จบการค้นหา**. ถ้าไม่เจอ, ไป 'ลำดับ F'.
-
-                            **F. กฎทั่วไป (ว่างเปล่า, อนุโลม 6 คาบ - อันดับ 6):**
-                               ก. (ตรวจสอบต่อจาก E) กลับไปหา 'ครูทั่วไป' ที่มีสถานะเป็น **"ว่าง-ตารางโล่ง"** + สอนได้ (ยอมให้ครบ 6 คาบ).
-                               ข. ถ้าเจอ, ให้สอนแทน (เหตุผล: **กฎทั่วไป - ครูว่าง (อนุโลม)**) และ **จบการค้นหา**. ถ้าไม่เจอ, ไป 'ลำดับ G'.
-
-                            **G. กฎอังกฤษ (ว่างเปล่า, อนุโลม 6 คาบ - อันดับ 7):**
-                               ก. (ตรวจสอบต่อจาก F) ถ้าเป็นวิชาอังกฤษ, หา 'ครูคีร่า' ที่มีสถานะเป็น **"ว่าง-ตารางโล่ง"** + สอนได้, ยอมให้ครบ 6 คาบ.
-                               ข. ถ้าเจอ, ให้สอนแทน (เหตุผล: **กฎอังกฤษ - ครูว่าง (อนุโลม)**) และ **จบการค้นหา**. ถ้าไม่เจอ, ไป 'ลำดับ H'.
-
-                            **H. กฎสุดท้าย (ครูติว - อันดับ 8):**
-                               ก. (ตรวจสอบต่อจาก G) หา 'ครูติว O-NET' คนอื่น (ที่**ไม่ใช่**คนที่กำลังติวในเวลานั้น) ที่มีสถานะเป็น **"ว่าง-สลับคาบ" หรือ "ว่าง-ตารางโล่ง"** + สอนได้.
-                               ข. ถ้าเจอ, ให้สอนแทน (เหตุผล: **กฎครูติวว่าง**) และ **จบการค้นหา**. ถ้าไม่เจอ, ระบุว่า "หาผู้สอนแทนไม่ได้".
-
-                    4.  **สร้างผลลัพธ์:** แสดงผลครู 4 คนจากข้อ 1. ถ้าใครไม่มีคาบแทน (ตามข้อ 2), ให้ระบุ "- ไม่มีคาบที่ต้องสอนแทน (เหตุผล: ...)".
-
-                    --- ข้อมูลจากไฟล์ ---
-                    **ตารางติว O-NET:** ${onetScheduleText}
-                    **ตารางสอนปกติ:** ${teacherScheduleText}
-                    `;
-
-                const generatedText = await callGeminiAPI(finalPrompt);
-                
-                resultsOutput.innerHTML = generatedText; 
-                resultsContainer.classList.remove('hidden');
-
-            } catch (error) {
-                console.error('Analysis Error:', error);
-                 if (error.message.includes("อ่านไฟล์ TXT")) {
-                     setUIState(false, `เกิดข้อผิดพลาดในการอ่านไฟล์ TXT: โปรดตรวจสอบว่าไฟล์เป็น UTF-8`);
-                 } else {
-                     setUIState(false, `เกิดข้อผิดพลาด: ${error.message}`);
-                 }
-            } finally {
-                 setUIState(false);
-            }
-        });
-        // --- END: Main Analysis Logic ---
-
-        // --- START: Gemini API Call ---
-        async function callGeminiAPI(prompt) {
-            // START MOD: Use public Gemini API key
-            const apiKey = "AIzaSyAUi4fu9J1iikYAiElQImErVreemVbUC9Q"; 
-            // END MOD
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-
-            const payload = {
-                contents: [{
-                    parts: [{ text: prompt }]
-                }],
-                generationConfig: {
-                    temperature: 0.0,
-                    maxOutputTokens: 8192, 
-                }
-            };
-            
-            let response;
-            let attempts = 0;
-            const maxAttempts = 5;
-            let delay = 1000;
-
-            while (attempts < maxAttempts) {
-                try {
-                    response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (response.ok) {
-                        const result = await response.json();
-                        const candidate = result.candidates?.[0];
-
-                        if (candidate && candidate.content?.parts?.[0]?.text) {
-                            return candidate.content.parts[0].text;
-                        } else {
-                            let errorText = "ไม่พบข้อมูลที่คาดหวังในคำตอบจาก AI";
-                            if (candidate?.finishReason) {
-                                errorText += ` (เหตุผลการสิ้นสุด: ${candidate.finishReason})`;
+            allTeacherData.forEach(teacher => {
+                let baseWorkload = 0;
+                const normalSchedule = teacher.schedule[dayOfWeek];
+                if (normalSchedule) {
+                    normalSchedule.forEach(cls => {
+                        // Count as workload if it's a real subject
+                        if (cls.subject && !EXCLUDED_SUBJECTS.includes(cls.subject)) {
+                            // AND if the grade isn't away for O-NET tutoring at that time
+                            if (!isGradeTutoring(cls.grade, cls.period, onetDaySchedule)) {
+                                // *** CORRECTED LOGIC ***
+                                // AND if the teacher themself is NOT busy tutoring O-NET at this exact time
+                                // (If they are tutoring, this class is a "class to be covered" and not part of their base workload)
+                                if (!isTeacherTutoring(teacher.name, cls.period, onetDaySchedule)) {
+                                    baseWorkload++;
+                                }
                             }
-                            if (result.promptFeedback?.blockReason) {
-                                 errorText += ` (เหตุผลการบล็อก: ${result.promptFeedback.blockReason})`;
-                            }
-                            throw new Error(errorText);
                         }
-                    } else if (response.status === 429) { // Throttling
-                        console.warn(`API rate limit hit. Retrying in ${delay / 1000}s...`);
-                        await new Promise(res => setTimeout(res, delay));
-                        delay *= 2; // Exponential backoff
-                        attempts++;
+                    });
+                }
+                teacherWorkloads[teacher.name] = { base: baseWorkload, onet: 0, sub: 0, total: baseWorkload };
+            });
+
+            // 2. Add O-NET tutoring workload
+            onetDaySchedule.forEach(session => {
+                const tutorName = session.teacher;
+                if (teacherWorkloads[tutorName]) {
+                    const onetHours = session.periods.length;
+                    teacherWorkloads[tutorName].onet = onetHours;
+                    teacherWorkloads[tutorName].total += onetHours;
+                } else {
+                    console.warn(`O-NET tutor not found in teacher database: ${tutorName}`);
+                }
+            });
+
+            // 3. Find and assign substitutes
+            const finalSchedule = [];
+            const substitutionsMade = {}; // Tracks { period: [teacherName, ...], ... }
+
+            for (const session of onetDaySchedule) {
+                const tutorName = session.teacher;
+                const tutor = allTeacherData.find(t => t.name === tutorName);
+                const onetPeriods = session.periods; // e.g., [1, 2, 3]
+
+                if (!tutor) continue;
+
+                const scheduleEntry = {
+                    tutorName: tutor.name,
+                    reason: `ติดติว O-NET ${session.subject} ${session.grade} เวลา ${session.time}`,
+                    substitutions: []
+                };
+
+                const tutorNormalSchedule = tutor.schedule[dayOfWeek];
+
+                // Find classes the tutor is missing *because* of O-NET
+                for (const classToCover of tutorNormalSchedule) {
+                    const period = classToCover.period;
+
+                    // A. Must be a class during the O-NET session
+                    if (!onetPeriods.includes(period)) continue;
+
+                    // B. Must be a real subject (not excluded)
+                    if (!classToCover.subject || EXCLUDED_SUBJECTS.includes(classToCover.subject)) continue;
+
+                    // C. Must not be a class where students are also at O-NET (auto-exempted)
+                    if (isGradeTutoring(classToCover.grade, period, onetDaySchedule)) continue;
+
+                    // --- Find a substitute for this specific class ---
+                    let candidates = [];
+                    for (const potentialSub of allTeacherData) {
+                        // 1. Can't substitute for themselves
+                        if (potentialSub.name === tutorName) continue;
+
+                        // 2. Check if the potential sub is TRULY vacant at this period
+                        const subSchedule = potentialSub.schedule[dayOfWeek].find(s => s.period === period);
+                        let isVacant = false;
+
+                        // 2a. Vacant if they have no class or an excluded class
+                        if (!subSchedule || !subSchedule.subject || EXCLUDED_SUBJECTS.includes(subSchedule.subject)) {
+                            isVacant = true;
+                        } 
+                        // 2b. Also vacant if their normal class's students (P.6/M.3) are at O-NET
+                        else if (isGradeTutoring(subSchedule.grade, period, onetDaySchedule)) {
+                             isVacant = true;
+                        }
+
+                        // 2c. BUT, they are NOT vacant if they are *also* an O-NET tutor and tutoring *this* period
+                        if (isTeacherTutoring(potentialSub.name, period, onetDaySchedule)) {
+                            isVacant = false; // Overrule: They are busy tutoring O-NET
+                        }
+
+                        // 2d. NOT vacant if they have *already* been assigned a sub class this period
+                        if (substitutionsMade[period] && substitutionsMade[period].includes(potentialSub.name)) {
+                            isVacant = false;
+                        }
+
+                        // 3. If not vacant, skip them
+                        if (!isVacant) continue;
+
+                        // 4. Check if they are qualified to teach this class
+                        if (!canTeacherSubstitute(potentialSub, classToCover.grade, classToCover.subject)) {
+                            continue;
+                        }
+
+                        // 5. If all checks pass, they are a candidate
+                        candidates.push({
+                            name: potentialSub.name,
+                            currentWorkload: teacherWorkloads[potentialSub.name].total
+                        });
+                    }
+
+                    // --- Assign the best candidate ---
+                    if (candidates.length > 0) {
+                        // Sort by lowest workload first
+                        candidates.sort((a, b) => a.currentWorkload - b.currentWorkload);
+                        
+                        const bestSubName = candidates[0].name;
+                        const newWorkload = candidates[0].currentWorkload + 1;
+
+                        scheduleEntry.substitutions.push({
+                            period: period,
+                            classInfo: `${classToCover.grade || 'ไม่ระบุ'}/${classToCover.subject}`,
+                            subTeacher: bestSubName,
+                            reason: `ครูว่าง (คาบรวมน้อยสุด), คาบรวม=${newWorkload}`
+                        });
+
+                        // Update workload and mark as assigned
+                        teacherWorkloads[bestSubName].sub++;
+                        teacherWorkloads[bestSubName].total++;
+
+                        if (!substitutionsMade[period]) {
+                            substitutionsMade[period] = [];
+                        }
+                        substitutionsMade[period].push(bestSubName);
+
                     } else {
-                        const errorResult = await response.json();
-                        throw new Error(errorResult.error ? errorResult.error.message : `HTTP error! status: ${response.status}`);
+                        // No candidates found
+                        scheduleEntry.substitutions.push({
+                            period: period,
+                            classInfo: `${classToCover.grade || 'ไม่ระบุ'}/${classToCover.subject}`,
+                            subTeacher: null,
+                            reason: 'หาคนสอนแทนไม่ได้'
+                        });
                     }
-                } catch (error) {
-                    if(attempts >= maxAttempts -1){
-                        throw error; // Throw the error if max attempts reached
-                    }
-                    console.warn(`Fetch error. Retrying in ${delay / 1000}s...`, error);
-                    await new Promise(res => setTimeout(res, delay));
-                    delay *= 2; // Exponential backoff
-                    attempts++;
+                }
+
+                // Only add to final schedule if there was at least one class to cover
+                if (scheduleEntry.substitutions.length > 0) {
+                    finalSchedule.push(scheduleEntry);
                 }
             }
 
-            throw new Error("ไม่สามารถรับข้อมูลจาก AI ได้หลังจากพยายามหลายครั้ง");
+             return { schedule: finalSchedule, fullDateText, dayOfWeekText };
         }
-        // --- END: Gemini API Call ---
+
+        // --- UI Rendering ---
+
+        const datePicker = document.getElementById('date-picker');
+        const resultsDiv = document.getElementById('schedule-results');
+        const exportBtn = document.getElementById('export-btn');
+        const shareBtn = document.getElementById('share-btn');
+        const toast = document.getElementById('toast');
+        let toastTimeout;
+
+
+        function showToast(message) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            clearTimeout(toastTimeout); // Clear previous timeout if any
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000); // Hide after 3 seconds
+        }
+
+        function renderSchedule() {
+            const selectedDateValue = datePicker.value;
+            const dateKey = formatDateToKey(selectedDateValue);
+            const { schedule, fullDateText, dayOfWeekText } = generateSubstituteSchedule(dateKey);
+
+            resultsDiv.innerHTML = ''; // Clear previous results
+
+            // Create and append header for schedule results
+            const header = document.createElement('h3');
+            header.className = "text-2xl font-bold text-center text-indigo-700 mb-6";
+            header.innerHTML = `📆 ผลการจัดตารางสอนแทน ${dayOfWeekText} ${fullDateText}`;
+
+
+            if (schedule.length > 0) {
+                resultsDiv.appendChild(header); // Append header only if there are results
+
+                // Create schedule entries
+                schedule.forEach(tutorEntry => {
+                    const entryDiv = document.createElement('div');
+                    entryDiv.className = "bg-slate-50 p-5 rounded-lg shadow-md border border-slate-200";
+
+                    // Tutor name and reason
+                    const tutorHeader = document.createElement('h4');
+                    tutorHeader.className = "text-xl font-semibold text-indigo-900 mb-4";
+                    tutorHeader.innerHTML = `สอนแทน ${tutorEntry.tutorName}
+                        <span class="font-normal text-slate-700 text-base block md:inline md:ml-2">
+                            (${tutorEntry.reason})
+                        </span>`;
+                    entryDiv.appendChild(tutorHeader);
+
+                    // List of substitutions
+                    const subList = document.createElement('ul');
+                    subList.className = "list-disc list-inside space-y-3 pl-2";
+
+                    tutorEntry.substitutions.forEach(sub => {
+                        const listItem = document.createElement('li');
+                        listItem.className = "text-slate-800 text-base md:text-lg";
+
+                        let subTeacherHtml;
+                        if (sub.subTeacher) {
+                            subTeacherHtml = `<strong class="text-green-700 ml-1">${sub.subTeacher}</strong>`;
+                        } else {
+                            subTeacherHtml = `<strong class="text-red-600 ml-1">หาคนสอนแทนไม่ได้</strong>`;
+                        }
+
+                        listItem.innerHTML = `
+                            <strong class="text-slate-900">คาบ ${sub.period}:</strong> ${sub.classInfo} →
+                            ${subTeacherHtml}
+                            <span class="text-sm text-slate-500 block md:inline md:ml-2">
+                                (${sub.reason})
+                            </span>`;
+                        subList.appendChild(listItem);
+                    });
+
+                    entryDiv.appendChild(subList);
+                    resultsDiv.appendChild(entryDiv);
+                });
+            } else {
+                // No O-NET or no substitutions needed - Append header first
+                 resultsDiv.appendChild(header); // Still show the date header
+                 const noDataPara = document.createElement('p');
+                noDataPara.className = "text-center text-slate-500 text-xl font-medium py-8";
+                noDataPara.textContent = dayOfWeekText ? `ไม่มีการติว O-NET หรือไม่มีคาบสอนแทนในวันนี้` : "กรุณาเลือกวันที่ที่ถูกต้อง";
+                resultsDiv.appendChild(noDataPara);
+            }
+        }
+
+        // --- Event Listeners ---
+        datePicker.addEventListener('change', renderSchedule);
+
+        exportBtn.addEventListener('click', () => {
+            const scheduleElement = document.getElementById('schedule-results');
+            if (!scheduleElement || scheduleElement.children.length === 0 || scheduleElement.querySelector('p')) {
+                showToast('ไม่มีตารางสอนให้ Export');
+                return;
+            }
+
+            // Temporarily increase scale for higher resolution
+            html2canvas(scheduleElement, {
+                scale: 3, // Increase scale for better quality
+                useCORS: true, // If using external fonts/images (though not applicable here)
+                backgroundColor: '#ffffff' // Ensure background is white
+             }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `ตารางสอนแทน-${datePicker.value}.jpg`;
+                link.href = canvas.toDataURL('image/jpeg', 0.95); // Use JPEG format, quality 0.95
+                link.click();
+            }).catch(err => {
+                 console.error("Error exporting image:", err);
+                 showToast('เกิดข้อผิดพลาดในการ Export รูปภาพ');
+            });
+        });
+
+        // Updated Share Button Logic
+        shareBtn.addEventListener('click', async () => {
+            const scheduleElement = document.getElementById('schedule-results');
+            const dateValue = datePicker.value;
+
+            if (!scheduleElement || scheduleElement.children.length === 0 || scheduleElement.querySelector('p')) {
+                showToast('ไม่มีตารางสอนให้แชร์');
+                return;
+            }
+
+            // Check if Web Share API is supported and can share files
+            if (navigator.share && navigator.canShare) {
+                try {
+                    // Generate image from schedule element
+                    const canvas = await html2canvas(scheduleElement, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+                    canvas.toBlob(async (blob) => {
+                        if (!blob) {
+                            showToast('ไม่สามารถสร้างรูปภาพได้');
+                            return;
+                        }
+                        const fileName = `ตารางสอนแทน-${dateValue}.jpg`;
+                        const file = new File([blob], fileName, { type: 'image/jpeg' });
+                        const shareData = {
+                            files: [file],
+                            title: `ตารางสอนแทนวันที่ ${dateValue}`,
+                            text: `ตารางสอนแทนวันที่ ${dateValue}`,
+                        };
+
+                        // Check if the browser *can* share these files
+                        if (navigator.canShare(shareData)) {
+                            try {
+                                await navigator.share(shareData);
+                                console.log('Image shared successfully');
+                            } catch (err) {
+                                console.error('Share failed:', err.message);
+                                // Fallback if sharing fails (e.g., user cancels)
+                                showToast('การแชร์ถูกยกเลิก หรือ ไม่สำเร็จ');
+                                // Optional: Suggest export as fallback here too?
+                            }
+                        } else {
+                             console.warn('Cannot share files according to navigator.canShare');
+                             showToast('เบราว์เซอร์ไม่รองรับการแชร์ไฟล์รูปภาพโดยตรง กรุณา Export แล้วแชร์ด้วยตนเอง');
+                        }
+                    }, 'image/jpeg', 0.95); // Convert to Blob
+
+                } catch (err) {
+                    console.error('Error generating or sharing image:', err);
+                    showToast('เกิดข้อผิดพลาดในการแชร์รูปภาพ กรุณา Export แล้วแชร์ด้วยตนเอง');
+                }
+            } else {
+                // Fallback for browsers that don't support Web Share API or file sharing
+                showToast('เบราว์เซอร์ไม่รองรับการแชร์รูปภาพโดยตรง กรุณา Export แล้วแชร์ด้วยตนเอง');
+            }
+        });
+
+
+        // Fallback copy function using document.execCommand (kept in case needed elsewhere, but not used by share image)
+        function copyUsingExecCommand(text) {
+             const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";  // Avoid scrolling to bottom
+            textArea.style.top = "0";
+            textArea.style.left = "0";
+            textArea.style.opacity = "0"; // Make it invisible
+
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showToast('คัดลอกลิงก์ไปยังคลิปบอร์ดแล้ว'); // Might need to change this text if used for other purposes
+                } else {
+                     showToast('ไม่สามารถคัดลอกได้');
+                }
+            } catch (err) {
+                 console.error('Fallback: Oops, unable to copy', err);
+                 showToast('ไม่สามารถคัดลอกได้');
+            }
+
+            document.body.removeChild(textArea);
+        }
+
+        // --- Initial Load ---
+        // Run schedule generation on page load with the default date
+        document.addEventListener('DOMContentLoaded', renderSchedule);
 
     </script>
+
 </body>
 </html>
 
