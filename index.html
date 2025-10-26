@@ -111,14 +111,17 @@
 
             <!-- Tabs -->
             <div class="mb-4 border-b border-gray-200">
-                <nav class="-mb-px flex justify-center space-x-8" aria-label="Tabs">
-                    <button id="tab-teacher" class="tab-button active" data-tab="teacher-schedule">
-                        ตารางสอนแทน (สำหรับครู)
-                    </button>
-                    <button id="tab-student" class="tab-button" data-tab="student-schedule">
-                        ตารางเรียน (สำหรับนักเรียน)
-                    </button>
-                </nav>
+ <nav class="-mb-px flex justify-center space-x-8" aria-label="Tabs">
+    <button id="tab-teacher" class="tab-button active" data-tab="teacher-schedule">
+        ตารางสอนแทน (สำหรับครู)
+    </button>
+    <button id="tab-student" class="tab-button" data-tab="student-schedule">
+        ตารางเรียน (สำหรับนักเรียน)
+    </button>
+    <button id="tab-summary" class="tab-button" data-tab="summary">
+        <i class="fas fa-chart-bar mr-2"></i> สรุปชั่วโมงสอน
+    </button>
+</nav>
             </div>
 
             <!-- Tab Content Area -->
@@ -133,13 +136,20 @@
                 </div>
 
                 <!-- Student Schedule Content -->
-                <div id="student-schedule-content" class="tab-content space-y-6 bg-white p-1">
-                   <h3 id="student-schedule-header" class="text-2xl font-bold text-center text-indigo-700 mb-6"></h3>
-                   <div id="student-schedule-details">
-                       <!-- Student schedule will be rendered here -->
-                   </div>
-                   <p id="student-schedule-nodata" class="text-center text-slate-500 text-xl font-medium py-8 hidden"></p>
-                </div>
+<div id="student-schedule-content" class="tab-content space-y-6 bg-white p-1">
+   <h3 id="student-schedule-header" class="text-2xl font-bold text-center text-indigo-700 mb-6"></h3>
+   <div id="student-schedule-details">
+       </div>
+   <p id="student-schedule-nodata" class="text-center text-slate-500 text-xl font-medium py-8 hidden"></p>
+</div>
+
+        <div id="summary-content" class="tab-content space-y-6 bg-white p-1">
+           <h3 id="summary-schedule-header" class="text-2xl font-bold text-center text-indigo-700 mb-6"></h3>
+           <div id="summary-schedule-details" class="overflow-x-auto">
+               </div>
+           <p id="summary-schedule-nodata" class="text-center text-slate-500 text-xl font-medium py-8 hidden"></p>
+        </div>
+    </div>
             </div>
 
         </div>
@@ -478,7 +488,7 @@
           {
             name: 'ครูณัฐชนม์ วงศ์มา',
             type: 'tutor',
-            canTeachGrades: ['ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3'],
+            canTeachGrades: [],
             canTeachSpecial: null,
             schedule: {
               'วันจันทร์': [
@@ -526,7 +536,7 @@
           {
             name: 'ครูดำเนิน ว่าดี',
             type: 'tutor',
-            canTeachGrades: ['ป.6', 'ม.1', 'ม.2', 'ม.3'],
+            canTeachGrades: [],
             canTeachSpecial: null,
             schedule: {
               'วันจันทร์': [
@@ -574,7 +584,7 @@
           {
             name: 'ครูอมรเทพ จันทร์ครบ',
             type: 'tutor',
-            canTeachGrades: ['ป.6', 'ม.1', 'ม.2', 'ม.3'],
+            canTeachGrades: [],
             canTeachSpecial: null,
             schedule: {
               'วันจันทร์': [
@@ -622,7 +632,7 @@
           {
             name: 'ครูสายรุ้ง เรืองสุขสุด',
             type: 'tutor',
-            canTeachGrades: ['ป.5', 'ม.1', 'ม.2', 'ม.3'],
+            canTeachGrades: [],
             canTeachSpecial: null,
             schedule: {
               'วันจันทร์': [
@@ -670,7 +680,7 @@
           {
             name: 'ครูอรุณลักษณ์ การกระสัง',
             type: 'tutor',
-            canTeachGrades: ['ป.1', 'ป.2', 'ป.4', 'ป.5', 'ป.6'],
+            canTeachGrades: [],
             canTeachSpecial: null,
             schedule: {
               'วันจันทร์': [
@@ -864,7 +874,7 @@
           {
             name: 'ครูพจนาจ หวลระลึก',
             type: 'general',
-            canTeachGrades: ['ป.1', 'ป.2', 'ป.3', 'ป.4', 'ป.5', 'ป.6'],
+            canTeachGrades: ['ป.4', 'ป.5', 'ป.6'],
             canTeachSpecial: null,
             schedule: {
               'วันจันทร์': [
@@ -1056,7 +1066,7 @@
           {
             name: 'ครูกฤติยา ศรีเพชร',
             type: 'general',
-            canTeachGrades: ['ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3'],
+            canTeachGrades: ['ม.1', 'ม.2', 'ม.3'],
             canTeachSpecial: null,
             schedule: {
               'วันจันทร์': [
@@ -1167,6 +1177,14 @@
           const buddhistYear = parseInt(year) + 543;
           return `${day}/${month}/${buddhistYear}`;
         }
+		
+		function dateKeyToDate(dateKey) {
+    if (!dateKey) return null;
+    const [day, month, year] = dateKey.split('/');
+    const gregorianYear = parseInt(year) - 543;
+    // month - 1 เพราะ JavaScript นับเดือนจาก 0-11
+    return new Date(gregorianYear, parseInt(month) - 1, parseInt(day));
+}
 
         function getDayOfWeek(dateKey) {
           if (!dateKey) return null;
@@ -1225,7 +1243,41 @@
             return false;
         }
 
-        // --- CORE SUBSTITUTION LOGIC (returns both teacher and student schedules) ---
+function parseGradeToNumber(grade) {
+            if (!grade || typeof grade !== 'string') return 0;
+            const num = parseInt(grade.replace(/\D/g, ''));
+            if (isNaN(num)) return 0;
+            if (grade.startsWith('ม')) return num + 6; // ป.6 = 6, ม.1 = 7
+            return num; // ป.1 = 1, ป.5 = 5
+        }
+
+        function getGradeProximity(teacherGrades, targetGrade) {
+            const targetNum = parseGradeToNumber(targetGrade);
+            if (targetNum === 0) return 99; // Cannot compare
+            if (!teacherGrades || teacherGrades.length === 0) return 99; // Teacher has no specified grades
+
+            let minDiff = Infinity;
+            for (const g of teacherGrades) {
+                const diff = Math.abs(parseGradeToNumber(g) - targetNum);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                }
+            }
+            return minDiff;
+        }
+		
+		function isTeacherP1toP3Only(teacher) {
+            // ถ้าครูไม่มี canTeachGrades (เช่น ครูสอนภาษา) ให้ถือว่าไม่ใช
+            if (!teacher.canTeachGrades || teacher.canTeachGrades.length === 0) {
+                return false; 
+            }
+            
+            // ตรวจสอบว่า "ทุกระดับชั้น" ที่ครูสอนได้ อยู่ในช่วง ป.1 - ป.3 หรือไม่
+            return teacher.canTeachGrades.every(grade => {
+                const gradeNum = parseGradeToNumber(grade); // ป.1=1, ป.2=2, ป.3=3
+                return gradeNum >= 1 && gradeNum <= 3;
+            });
+        }
 
         function generateSchedules(dateKey) {
             const onetDaySchedule = onetData[dateKey];
@@ -1318,36 +1370,93 @@
 
 
                     // --- Find Substitute ---
-                    let candidates = [];
-                    // (Candidate finding logic remains largely the same as before)
+// --- Find Substitute (Revised Logic) ---
+                    let qualifiedCandidates = [];
+                    let fallbackCandidates = []; // Teachers who are vacant but not qualified
+
                      for (const potentialSub of allTeacherData) {
                         if (potentialSub.name === tutorName) continue; // Cannot sub self
 
-                        const subScheduleSlot = potentialSub.schedule[dayOfWeek].find(s => s.period === period);
-                        let isVacant = (!subScheduleSlot || !subScheduleSlot.subject || EXCLUDED_SUBJECTS.includes(subScheduleSlot.subject)) || isGradeTutoring(subScheduleSlot?.grade, period, onetDaySchedule);
-
+                        // Check 1: Is teacher busy with O-NET or already subbing?
                         if (isTeacherTutoring(potentialSub.name, period, onetDaySchedule) || (substitutionsMade[period] && substitutionsMade[period].includes(potentialSub.name))) {
-                            isVacant = false;
+                            continue; // This teacher is busy
                         }
+                        
+                        // Check 2: Is teacher's normal schedule vacant?
+                        const subScheduleSlot = potentialSub.schedule[dayOfWeek].find(s => s.period === period);
+                        let isVacant = (!subScheduleSlot || !subScheduleSlot.subject || EXCLUDED_SUBJECTS.includes(subScheduleSlot.subject)) 
+                                       || isGradeTutoring(subScheduleSlot?.grade, period, onetDaySchedule); // Slot is vacant OR their students are away
 
-                        if (isVacant && canTeacherSubstitute(potentialSub, grade, subject)) {
-                            candidates.push({ name: potentialSub.name, currentWorkload: teacherWorkloads[potentialSub.name].total });
+                        if (isVacant) {
+                            const workload = teacherWorkloads[potentialSub.name].total;
+
+                            // Check 3: Are they qualified?
+                            if (canTeacherSubstitute(potentialSub, grade, subject)) {
+                                qualifiedCandidates.push({ 
+                                    name: potentialSub.name, 
+                                    currentWorkload: workload 
+                                });
+                            } else {
+                            // They are vacant, but not qualified. Check new P.1-P.3 rule.
+                            const targetGradeNum = parseGradeToNumber(grade); // P.4=4, P.5=5, etc.
+                            const isP1toP3Teacher = isTeacherP1toP3Only(potentialSub);
+
+                            // --- กฎใหม่: ครู ป.1-3 ห้ามสอนแทน ป.4 ขึ้นไป ---
+                            if (isP1toP3Teacher && targetGradeNum > 3) {
+                                // ครูคนนี้สอนเฉพาะ ป.1-3 และงานสอนแทนคือ ป.4+
+                                // ห้ามเพิ่มลงในรายชื่อครูสำรอง (fallback)
+                            } else {
+                                // ถ้าไม่เข้าข่ายกฎใหม่ ให้เพิ่มลงในรายชื่อครูสำรองตามปกติ
+                                const proximity = getGradeProximity(potentialSub.canTeachGrades, grade);
+                                fallbackCandidates.push({
+                                    name: potentialSub.name,
+                                    currentWorkload: workload,
+                                    proximity: proximity
+                                });
+                            }
+                        }
                         }
                     }
 
-                    // --- Assign Substitute ---
-                    if (candidates.length > 0) {
-                        candidates.sort((a, b) => a.currentWorkload - b.currentWorkload);
-                        const bestSubName = candidates[0].name;
-                        const newWorkload = candidates[0].currentWorkload + 1;
+                    // --- Assign Substitute (Revised Logic) ---
+                    let bestSubName = null;
+                    let reason = '';
+                    let newWorkload = 0;
 
-                        scheduleEntry.substitutions.push({
-                            period: period,
-                            classInfo: `${grade || 'ไม่ระบุ'}/${subject}`,
-                            subTeacher: bestSubName,
-                            reason: `ครูว่าง (คาบรวมน้อยสุด), คาบรวม=${newWorkload}`
+                    if (qualifiedCandidates.length > 0) {
+                        // Case 1: Found qualified subs. Sort by workload.
+                        qualifiedCandidates.sort((a, b) => a.currentWorkload - b.currentWorkload);
+                        bestSubName = qualifiedCandidates[0].name;
+                        newWorkload = qualifiedCandidates[0].currentWorkload + 1;
+                        reason = `ครูว่าง (คาบรวมน้อยสุด), คาบรวม=${newWorkload}`;
+
+                    } else if (fallbackCandidates.length > 0) {
+                        // Case 2: No qualified subs. Use fallback list.
+                        // Sort by proximity, then by workload
+                        fallbackCandidates.sort((a, b) => {
+                            if (a.proximity !== b.proximity) {
+                                return a.proximity - b.proximity; // Sort by closest grade
+                            }
+                            return a.currentWorkload - b.currentWorkload; // Then by lowest workload
                         });
+                        bestSubName = fallbackCandidates[0].name;
+                        newWorkload = fallbackCandidates[0].currentWorkload + 1;
+                        reason = `มอบหมายครู (ใกล้เคียงสุด/คาบรวมน้อยสุด), คาบรวม=${newWorkload}`;
+                    
+                    } else {
+                        // Case 3: No one is vacant.
+                        reason = 'หาคนสอนแทนไม่ได้ (ทุกครูติดสอน/ติว)';
+                    }
 
+                    // --- Record the assignment (or failure) ---
+                    scheduleEntry.substitutions.push({
+                        period: period,
+                        classInfo: `${grade || 'ไม่ระบุ'}/${subject}`,
+                        subTeacher: bestSubName, // This will be null if no one was found
+                        reason: reason
+                    });
+
+                    if (bestSubName) {
                         // Update workload and track assignment
                         teacherWorkloads[bestSubName].sub++;
                         teacherWorkloads[bestSubName].total++;
@@ -1368,14 +1477,7 @@
                                  finalPeriodAssignments[period][grade].teacher = bestSubName; // Overwrite anyway?
                              }
                         }
-
                     } else {
-                        scheduleEntry.substitutions.push({
-                            period: period,
-                            classInfo: `${grade || 'ไม่ระบุ'}/${subject}`,
-                            subTeacher: null,
-                            reason: 'หาคนสอนแทนไม่ได้'
-                        });
                          // No sub found, mark as no teacher in student schedule
                         if (grade && finalPeriodAssignments[period]?.[grade]?.originalTeacher === tutorName) {
                            finalPeriodAssignments[period][grade].teacher = null; // Mark teacher as null
@@ -1419,6 +1521,101 @@
 
             return { teacherSchedule: teacherSubSchedule, studentScheduleByGrade, fullDateText: initialResult.fullDateText, dayOfWeekText: initialResult.dayOfWeekText };
         }
+		
+		// --- CORE WORKLOAD SUMMARY LOGIC ---
+
+function calculateWorkloadSummary(startDateKey, endDateKey) {
+    const summary = {};
+    const startDate = dateKeyToDate(startDateKey);
+    const endDate = dateKeyToDate(endDateKey);
+
+    // 1. Initialize summary object for all teachers
+    allTeacherData.forEach(teacher => {
+        summary[teacher.name] = {
+            name: teacher.name,
+            type: teacher.type,
+            normal: 0,
+            sub: 0,
+            onet: 0,
+            total: 0
+        };
+    });
+
+    // 2. Iterate through all dates in onetData
+    for (const dateKey in onetData) {
+        const currentDate = dateKeyToDate(dateKey);
+
+        // Check if the date is within the specified range
+        if (currentDate >= startDate && currentDate <= endDate) {
+            const dayOfWeek = getDayOfWeek(dateKey);
+            const onetDaySchedule = onetData[dateKey];
+
+            if (!dayOfWeek || !onetDaySchedule) continue; // Skip if no schedule or invalid day
+
+            // 3. Calculate O-NET hours
+            onetDaySchedule.forEach(session => {
+                if (summary[session.teacher]) {
+                    summary[session.teacher].onet += session.periods.length;
+                }
+            });
+
+            // 4. Calculate Substitute hours (by running the daily schedule generator)
+            const dailySchedules = generateSchedules(dateKey);
+            dailySchedules.teacherSchedule.forEach(tutorEntry => {
+                tutorEntry.substitutions.forEach(sub => {
+                    if (sub.subTeacher && summary[sub.subTeacher]) {
+                        summary[sub.subTeacher].sub += 1; // 1 sub assignment = 1 hour
+                    }
+                });
+            });
+
+            // 5. Calculate Normal hours (excluding P.6, M.3, and own tutoring time)
+            allTeacherData.forEach(teacher => {
+                const teacherName = teacher.name;
+                const normalSchedule = teacher.schedule[dayOfWeek];
+                if (!normalSchedule) return;
+
+                for (let period = 1; period <= 6; period++) {
+                    const cls = normalSchedule.find(s => s.period === period);
+
+                    if (!cls || !cls.subject || !cls.grade || EXCLUDED_SUBJECTS.includes(cls.subject)) {
+                        continue; // Skip if no class, no subject, or excluded subject
+                    }
+
+                    // --- APPLY EXCLUSION RULES ---
+
+                    // Rule 1: Exclude if teacher is tutoring at this time
+                    if (isTeacherTutoring(teacherName, period, onetDaySchedule)) {
+                        continue; 
+                    }
+
+                    // Rule 2: Exclude if the class is P.6 or M.3 (students are at O-NET)
+                    if (cls.grade === 'ป.6' || cls.grade === 'ม.3') {
+                        continue;
+                    }
+
+                    // If all checks pass, it's a valid normal teaching hour
+                    summary[teacherName].normal += 1;
+                }
+            });
+        }
+    }
+
+    // 6. Calculate totals
+    const summaryArray = Object.values(summary).map(teacher => {
+        teacher.total = teacher.normal + teacher.sub + teacher.onet;
+        return teacher;
+    });
+
+    // 7. Sort the array: Tutors first, then by total hours
+    summaryArray.sort((a, b) => {
+        if (a.type === 'tutor' && b.type !== 'tutor') return -1;
+        if (a.type !== 'tutor' && b.type === 'tutor') return 1;
+        return b.total - a.total; // Sort by total descending
+    });
+
+    return summaryArray;
+}
 
 
         // --- UI Rendering ---
@@ -1434,12 +1631,17 @@
         const studentHeaderEl = document.getElementById('student-schedule-header');
         const teacherNoDataEl = document.getElementById('teacher-schedule-nodata');
         const studentNoDataEl = document.getElementById('student-schedule-nodata');
+		const summaryContent = document.getElementById('summary-content');
+const summaryHeaderEl = document.getElementById('summary-schedule-header');
+const summaryScheduleDetails = document.getElementById('summary-schedule-details');
+const summaryNoDataEl = document.getElementById('summary-schedule-nodata');
         // Action buttons & Toast
         const exportBtn = document.getElementById('export-btn');
         const shareBtn = document.getElementById('share-btn');
         const toast = document.getElementById('toast');
         let toastTimeout;
         let currentFullSchedule = null; // Store the generated schedule
+		let workloadSummaryData = null; // เพิ่มตัวแปรนี้
 
         function showToast(message) {
             toast.textContent = message;
@@ -1539,7 +1741,66 @@
                   studentNoDataEl.classList.remove('hidden');
              }
         }
+				
+// *** Function to render the Workload Summary table ***
+function renderWorkloadSummary(summaryData) {
+    summaryScheduleDetails.innerHTML = ''; // Clear previous table
+    summaryNoDataEl.classList.add('hidden');
+    summaryHeaderEl.textContent = `สรุปชั่วโมงสอนช่วงติว O-NET (10/11/2568 - 30/01/2569)`;
 
+    if (!summaryData || summaryData.length === 0) {
+        summaryNoDataEl.textContent = 'ไม่สามารถคำนวณข้อมูลสรุปได้';
+        summaryNoDataEl.classList.remove('hidden');
+        return;
+    }
+
+    // Create table structure
+    const table = document.createElement('table');
+    table.className = "min-w-full divide-y divide-slate-200 border border-slate-300 shadow-md rounded-lg";
+
+    // Create Table Header
+    const thead = document.createElement('thead');
+    thead.className = "bg-slate-100";
+    thead.innerHTML = `
+        <tr>
+            <th scope="col" class="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">ลำดับ</th>
+            <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">ชื่อ-สกุล</th>
+            <th scope="col" class="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">สอนปกติ</th>
+            <th scope="col" class="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">สอนแทน</th>
+            <th scope="col" class="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">ติว O-NET</th>
+            <th scope="col" class="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">รวม (ชั่วโมง)</th>
+        </tr>
+    `;
+    table.appendChild(thead);
+
+    // Create Table Body
+    const tbody = document.createElement('tbody');
+    tbody.className = "bg-white divide-y divide-slate-200";
+
+    summaryData.forEach((teacher, index) => {
+        const tr = document.createElement('tr');
+
+        // Apply highlight for tutors
+        if (teacher.type === 'tutor') {
+            tr.className = "bg-indigo-50 hover:bg-indigo-100";
+        } else {
+             tr.className = "hover:bg-slate-50";
+        }
+
+        tr.innerHTML = `
+            <td class="px-4 py-3 whitespace-nowrap text-center text-sm text-slate-500">${index + 1}</td>
+            <td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-slate-900">${teacher.type === 'tutor' ? '✅ ' : ''}${teacher.name}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-center text-sm text-slate-700">${teacher.normal}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-center text-sm text-slate-700">${teacher.sub}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-center text-sm text-slate-700">${teacher.onet}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-center text-sm font-bold text-indigo-800">${teacher.total}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    summaryScheduleDetails.appendChild(table);
+}
 
         // Main function to generate and render both schedules
         function generateAndRenderAllSchedules() {
@@ -1552,18 +1813,38 @@
         }
 
         // --- Tab Switching Logic ---
-        tabButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                // Deactivate all buttons and content
-                tabButtons.forEach(btn => btn.classList.remove('active'));
-                tabContents.forEach(content => content.classList.remove('active'));
+// --- Tab Switching Logic ---
+tabButtons.forEach(button => {
+    button.addEventListener('click', () => {
+        // Deactivate all buttons and content
+        tabButtons.forEach(btn => btn.classList.remove('active'));
+        tabContents.forEach(content => content.classList.remove('active'));
 
-                // Activate clicked button and corresponding content
-                button.classList.add('active');
-                const tabId = button.getAttribute('data-tab');
-                document.getElementById(tabId + '-content').classList.add('active');
-            });
-        });
+        // Activate clicked button and corresponding content
+        button.classList.add('active');
+        const tabId = button.getAttribute('data-tab');
+        document.getElementById(tabId + '-content').classList.add('active');
+
+        // --- LOGIC ที่เพิ่มเข้ามา ---
+        // If the summary tab is clicked, calculate (if not already done) and render
+        if (tabId === 'summary') {
+            if (workloadSummaryData === null) {
+                // Show a temporary loading message if needed
+                summaryHeaderEl.textContent = 'กำลังคำนวณข้อมูลสรุป...';
+                summaryScheduleDetails.innerHTML = '';
+
+                // Run calculation (use setTimeout to allow UI to update)
+                setTimeout(() => {
+                    workloadSummaryData = calculateWorkloadSummary("10/11/2568", "30/01/2569");
+                    renderWorkloadSummary(workloadSummaryData);
+                }, 50); // 50ms delay
+            } else {
+                // If data is already cached, just re-render it
+                renderWorkloadSummary(workloadSummaryData);
+            }
+        }
+    });
+});
 
 
         // --- Event Listeners ---
@@ -1573,9 +1854,12 @@
              // Target the *currently active tab's content* for export
              const activeTabContent = document.querySelector('.tab-content.active');
              // Determine which no-data element corresponds to the active tab
-             const isActiveTabTeacher = activeTabContent.id === 'teacher-schedule-content';
-             const noDataElement = isActiveTabTeacher ? teacherNoDataEl : studentNoDataEl;
-             const exportFileNamePrefix = isActiveTabTeacher ? 'ตารางสอนแทน' : 'ตารางเรียน';
+const isActiveTabTeacher = activeTabContent.id === 'teacher-schedule-content';
+const isActiveTabStudent = activeTabContent.id === 'student-schedule-content';
+const isActiveTabSummary = activeTabContent.id === 'summary-content';
+
+const noDataElement = isActiveTabTeacher ? teacherNoDataEl : (isActiveTabStudent ? studentNoDataEl : summaryNoDataEl);
+const exportFileNamePrefix = isActiveTabTeacher ? 'ตารางสอนแทน' : (isActiveTabStudent ? 'ตารางเรียน' : 'สรุปชั่วโมงสอน');
 
 
              if (!activeTabContent || !currentFullSchedule || noDataElement.offsetParent !== null ) { // Check if noDataElement is visible
@@ -1603,10 +1887,12 @@
         shareBtn.addEventListener('click', async () => {
              // Target the *currently active tab's content* for sharing
              const activeTabContent = document.querySelector('.tab-content.active');
-             const isActiveTabTeacher = activeTabContent.id === 'teacher-schedule-content';
-             const noDataElement = isActiveTabTeacher ? teacherNoDataEl : studentNoDataEl;
-             const shareTitlePrefix = isActiveTabTeacher ? 'ตารางสอนแทน' : 'ตารางเรียน';
-             const dateValue = datePicker.value;
+const isActiveTabTeacher = activeTabContent.id === 'teacher-schedule-content';
+const isActiveTabStudent = activeTabContent.id === 'student-schedule-content';
+const isActiveTabSummary = activeTabContent.id === 'summary-content';
+
+const noDataElement = isActiveTabTeacher ? teacherNoDataEl : (isActiveTabStudent ? studentNoDataEl : summaryNoDataEl);
+const shareTitlePrefix = isActiveTabTeacher ? 'ตารางสอนแทน' : (isActiveTabStudent ? 'ตารางเรียน' : 'สรุปชั่วโมงสอน');
 
 
              if (!activeTabContent || !currentFullSchedule || noDataElement.offsetParent !== null) { // Check visibility
