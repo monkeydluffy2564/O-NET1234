@@ -1852,19 +1852,15 @@ function renderWorkloadSummary(summaryData) {
     summaryScheduleDetails.appendChild(table);
 }
 
-// *** Function to render the O-NET Overview Table (ฟังก์ชันใหม่) ***
-function renderOnetOverviewTable() {
+// *** Function to render the O-NET Overview Table (แก้ไข) ***
+function renderOnetOverviewTable(selectedDateKey) { // <-- 1. รับ selectedDateKey
     onetOverviewDetails.innerHTML = '';
     onetOverviewNoDataEl.classList.add('hidden');
     onetOverviewHeaderEl.textContent = 'ภาพรวมตารางติว O-NET (10/11/2568 - 30/01/2569)';
 
-    // ใช้ cache ถ้ามี
-    if (onetOverviewTableHTML) {
-        onetOverviewDetails.innerHTML = onetOverviewTableHTML;
-        return;
-    }
+    // --- 2. ลบการใช้ Cache (if block) ออกไป ---
     
-    // --- สร้าง HTML ของตาราง ---
+    // ... (โค้ดสร้าง const table, thead, tbody ไม่เปลี่ยนแปลง) ...
     const table = document.createElement('table');
     table.className = "min-w-full divide-y divide-slate-200 border border-slate-300 shadow-md rounded-lg";
     table.innerHTML = `
@@ -1883,8 +1879,7 @@ function renderOnetOverviewTable() {
     `;
     const tbody = table.querySelector('tbody');
 
-    // ดึงวันที่ทั้งหมดจาก onetData และเรียงลำดับ
-    const allDates = Object.keys(onetData).sort((a, b) => dateKeyToDate(a) - dateKeyToDate(b)); //
+    const allDates = Object.keys(onetData).sort((a, b) => dateKeyToDate(a) - dateKeyToDate(b));
 
     if (allDates.length === 0) {
         onetOverviewNoDataEl.textContent = 'ไม่พบข้อมูลตารางติวในระบบ';
@@ -1893,23 +1888,26 @@ function renderOnetOverviewTable() {
     }
 
     allDates.forEach(dateKey => {
-        const dayOfWeek = getDayOfWeek(dateKey).replace('วัน', ''); // 'จันทร์', 'อังคาร', ...
-        const sessions = onetData[dateKey]; //
+        const dayOfWeek = getDayOfWeek(dateKey).replace('วัน', ''); 
+        const sessions = onetData[dateKey]; 
 
-        // ค้นหาข้อมูลติวในแต่ละช่วง
         const p6_m = sessions.find(s => s.grade === 'ป.6' && s.periods[0] < 4);
         const p6_a = sessions.find(s => s.grade === 'ป.6' && s.periods[0] >= 4);
         const m3_m = sessions.find(s => s.grade === 'ม.3' && s.periods[0] < 4);
         const m3_a = sessions.find(s => s.grade === 'ม.3' && s.periods[0] >= 4);
 
-        // ฟังก์ชันช่วยจัดรูปแบบช่อง
         const formatCell = (session) => {
             if (!session) return '<span class="text-slate-400">—</span>';
             return `<span class="text-sm font-medium">${session.subject}</span><br><span class="text-xs text-slate-600">(${session.teacher})</span>`;
         };
 
+        // --- 3. เพิ่มการตรวจสอบไฮไลต์ ---
+        const isSelected = (dateKey === selectedDateKey);
         const tr = document.createElement('tr');
-        tr.className = "hover:bg-slate-50";
+        // ใช้ bg-yellow-100 สำหรับแถวที่ถูกเลือก
+        tr.className = isSelected ? "bg-yellow-100 hover:bg-yellow-200" : "hover:bg-slate-50";
+        // --- จบส่วนที่ 3 ---
+
         tr.innerHTML = `
             <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-700">${dateKey}</td>
             <td class="px-2 py-3 whitespace-nowrap text-center text-sm text-slate-700">${dayOfWeek}</td>
@@ -1921,12 +1919,12 @@ function renderOnetOverviewTable() {
         tbody.appendChild(tr);
     });
 
-    // เก็บ HTML ไว้ใน cache และแสดงผล
+    // อัปเดต Cache ใหม่ทุกครั้ง (เพื่อให้ Export/Share ยังทำงานได้)
     onetOverviewTableHTML = table.outerHTML;
     onetOverviewDetails.appendChild(table);
 }
 
-        // Main function to generate and render both schedules
+// Main function to generate and render both schedules
         function generateAndRenderAllSchedules() {
             const selectedDateValue = datePicker.value;
             const dateKey = formatDateToKey(selectedDateValue);
@@ -1934,6 +1932,14 @@ function renderOnetOverviewTable() {
 
             renderTeacherSchedule(currentFullSchedule);
             renderStudentSchedule(currentFullSchedule);
+
+            // --- ส่วนที่เพิ่มเข้ามา ---
+            // ตรวจสอบว่าแท็บ "ภาพรวม" กำลังเปิดอยู่หรือไม่
+            const activeTab = document.querySelector('.tab-button.active');
+            if (activeTab && activeTab.getAttribute('data-tab') === 'onet-overview') {
+                // ถ้าใช่, สั่ง render ตารางภาพรวมใหม่ทันที
+                renderOnetOverviewTable(dateKey); 
+            }
         }
 		
 		// --- ฟังก์ชันสำหรับหมุนวนตารางติว (เพิ่มใหม่) ---
@@ -1965,6 +1971,9 @@ function renderOnetOverviewTable() {
 
             // 7. สั่ง Render แท็บสรุป/ภาพรวม (ถ้ากำลังเปิดอยู่)
             const activeTab = document.querySelector('.tab-button.active');
+            if (activeTab && activeTab.getAttribute('data-tab') === 'onet-overview') {
+                 renderOnetOverviewTable(dateKey); // <-- ส่ง dateKey เข้าไป
+            }
             if (activeTab) {
                 const activeTabId = activeTab.getAttribute('data-tab');
                 
@@ -1977,7 +1986,9 @@ function renderOnetOverviewTable() {
                     }, 50);
                 } else if (activeTabId === 'onet-overview') {
                     // บังคับแสดงผลแท็บภาพรวมตารางติวใหม่
-                    renderOnetOverviewTable(); //
+                    const selectedDateValue = datePicker.value;
+                    const dateKey = formatDateToKey(selectedDateValue);
+                    renderOnetOverviewTable(dateKey); // <-- ส่ง dateKey เข้าไป
                 }
             }
         }
@@ -2013,8 +2024,10 @@ tabButtons.forEach(button => {
                     renderWorkloadSummary(workloadSummaryData);
                 }
             } else if (tabId === 'onet-overview') {
-                // ฟังก์ชันนี้จัดการ cache ของตัวเอง
-                renderOnetOverviewTable();
+                // ฟังก์ชันนี้จะสร้างตารางพร้อมไฮไลต์
+                const selectedDateValue = datePicker.value;
+                const dateKey = formatDateToKey(selectedDateValue);
+                renderOnetOverviewTable(dateKey); // <-- ส่ง dateKey เข้าไป
             }
         });
     });
@@ -2185,8 +2198,23 @@ let exportFileNamePrefix = 'ตาราง';
             document.body.removeChild(textArea);
         }
 
-        // --- Initial Load ---
-        document.addEventListener('DOMContentLoaded', generateAndRenderAllSchedules); // Use the combined function
+// --- Initial Load ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- 1. ตั้งค่าวันที่เป็นวันปัจจุบัน ---
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            // getMonth() คืนค่า 0-11 จึงต้อง +1 และ padStart(2, '0') เพื่อให้เป็น 01, 02, ..., 12
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            // getDate() คืนค่า 1-31 และ padStart(2, '0') เพื่อให้เป็น 01, 02, ...
+            const dd = String(today.getDate()).padStart(2, '0');
+            
+            // Format: YYYY-MM-DD
+            datePicker.value = `${yyyy}-${mm}-${dd}`;
+            // --- จบส่วนที่ 1 ---
+
+            // 2. โหลดข้อมูลตามปกติ
+            generateAndRenderAllSchedules(); 
+        });
 
     </script>
 
