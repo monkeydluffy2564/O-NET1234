@@ -107,6 +107,23 @@
                 </button>
             </div>
 
+<div class="mt-8 text-center">
+                <label class="block text-lg font-medium text-slate-700 mb-3">
+                    <i class="fas fa-sync-alt mr-2"></i> โหมดหมุนวนตารางติว O-NET
+                </label>
+                <div class="flex justify-center items-center space-x-4">
+                    <button id="prev-rotation-btn" class="action-button bg-slate-500 hover:bg-slate-600 focus:ring-slate-300 w-16">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <span id="rotation-status" class="text-lg font-semibold text-indigo-700 w-32">
+                        รูปแบบ 1 / 4
+                    </span>
+                    <button id="next-rotation-btn" class="action-button bg-slate-500 hover:bg-slate-600 focus:ring-slate-300 w-16">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+
             <hr class="my-8" />
 
             <!-- Tabs -->
@@ -120,6 +137,9 @@
     </button>
     <button id="tab-summary" class="tab-button" data-tab="summary">
         <i class="fas fa-chart-bar mr-2"></i> สรุปชั่วโมงสอน
+    </button>
+	<button id="tab-onet-overview" class="tab-button" data-tab="onet-overview">
+        <i class="fas fa-calendar-alt mr-2"></i> ภาพรวมตารางติว
     </button>
 </nav>
             </div>
@@ -149,6 +169,13 @@
                </div>
            <p id="summary-schedule-nodata" class="text-center text-slate-500 text-xl font-medium py-8 hidden"></p>
         </div>
+<div id="onet-overview-content" class="tab-content bg-white p-1">
+           <h3 id="onet-overview-header" class="text-2xl font-bold text-center text-indigo-700 mb-6">ภาพรวมตารางติว O-NET ปีการศึกษา 2568</h3>
+           <div id="onet-overview-details" class="overflow-x-auto">
+               </div>
+           <p id="onet-overview-nodata" class="text-center text-slate-500 text-xl font-medium py-8 hidden"></p>
+        </div>
+    </div>
     </div>
             </div>
 
@@ -160,7 +187,7 @@
 
     <script>
         // --- DATABASE: O-NET Schedule (Updated Times) ---
-        const onetData = {
+        const originalOnetData = {
           "10/11/2568": [
             { periods: [1, 2, 3], subject: 'ภาษาอังกฤษ', grade: 'ป.6', teacher: 'ครูอรุณลักษณ์ การกระสัง', time: '08:00 - 11:30 น.' },
             { periods: [4, 5, 6], subject: 'คณิตศาสตร์', grade: 'ป.6', teacher: 'ครูอมรเทพ จันทร์ครบ', time: '12:30 - 16:00 น.' },
@@ -481,6 +508,22 @@
             { periods: [4, 5, 6], subject: 'ภาษาไทย', grade: 'ม.3', teacher: 'ครูดำเนิน ว่าดี', time: '12:30 - 16:00 น.' }
           ]
         };
+		
+		// --- 2. เพิ่มตัวแปรสำหรับโหมดหมุนวน ---
+        let onetData = originalOnetData; // ตัวแปรนี้คือข้อมูล O-NET ที่จะใช้จริง (หมุนวนได้)
+        let currentRotationIndex = 0;
+        
+        // ดึงวันที่ทั้งหมดมาเรียงลำดับ
+        const onetDateKeys = Object.keys(originalOnetData).sort((a, b) => dateKeyToDate(a) - dateKeyToDate(b)); //
+        
+        // เก็บ 4 รูปแบบตารางติวหลัก (จาก 4 วันแรก)
+        const onetSchedulePatterns = [
+            originalOnetData["10/11/2568"], // รูปแบบ 1 (E, M, S, T)
+            originalOnetData["11/11/2568"], // รูปแบบ 2 (T, S, M, E)
+            originalOnetData["12/11/2568"], // รูปแบบ 3 (M, E, T, S)
+            originalOnetData["13/11/2568"]  // รูปแบบ 4 (S, T, E, M)
+        ];
+        // --- สิ้นสุดส่วนที่เพิ่ม ---
 
         // --- DATABASE: Teacher Data & Schedules ---
         const allTeacherData = [
@@ -1635,6 +1678,12 @@ function calculateWorkloadSummary(startDateKey, endDateKey) {
 const summaryHeaderEl = document.getElementById('summary-schedule-header');
 const summaryScheduleDetails = document.getElementById('summary-schedule-details');
 const summaryNoDataEl = document.getElementById('summary-schedule-nodata');
+const onetOverviewHeaderEl = document.getElementById('onet-overview-header');
+const onetOverviewDetails = document.getElementById('onet-overview-details');
+const onetOverviewNoDataEl = document.getElementById('onet-overview-nodata');
+const prevRotationBtn = document.getElementById('prev-rotation-btn');
+const nextRotationBtn = document.getElementById('next-rotation-btn');
+const rotationStatus = document.getElementById('rotation-status');
         // Action buttons & Toast
         const exportBtn = document.getElementById('export-btn');
         const shareBtn = document.getElementById('share-btn');
@@ -1642,6 +1691,7 @@ const summaryNoDataEl = document.getElementById('summary-schedule-nodata');
         let toastTimeout;
         let currentFullSchedule = null; // Store the generated schedule
 		let workloadSummaryData = null; // เพิ่มตัวแปรนี้
+		let onetOverviewTableHTML = null; // Cache for the overview table
 
         function showToast(message) {
             toast.textContent = message;
@@ -1802,6 +1852,80 @@ function renderWorkloadSummary(summaryData) {
     summaryScheduleDetails.appendChild(table);
 }
 
+// *** Function to render the O-NET Overview Table (ฟังก์ชันใหม่) ***
+function renderOnetOverviewTable() {
+    onetOverviewDetails.innerHTML = '';
+    onetOverviewNoDataEl.classList.add('hidden');
+    onetOverviewHeaderEl.textContent = 'ภาพรวมตารางติว O-NET (10/11/2568 - 30/01/2569)';
+
+    // ใช้ cache ถ้ามี
+    if (onetOverviewTableHTML) {
+        onetOverviewDetails.innerHTML = onetOverviewTableHTML;
+        return;
+    }
+    
+    // --- สร้าง HTML ของตาราง ---
+    const table = document.createElement('table');
+    table.className = "min-w-full divide-y divide-slate-200 border border-slate-300 shadow-md rounded-lg";
+    table.innerHTML = `
+        <thead class="bg-indigo-100">
+            <tr>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-indigo-800 uppercase tracking-wider">วันที่</th>
+                <th scope="col" class="px-2 py-3 text-center text-xs font-semibold text-indigo-800 uppercase tracking-wider">วัน</th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-indigo-800 uppercase tracking-wider">ป.6 (08:00 - 11:30)</th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-indigo-800 uppercase tracking-wider">ป.6 (12:30 - 16:00)</th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-indigo-800 uppercase tracking-wider">ม.3 (08:00 - 11:30)</th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-indigo-800 uppercase tracking-wider">ม.3 (12:30 - 16:00)</th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-slate-200">
+        </tbody>
+    `;
+    const tbody = table.querySelector('tbody');
+
+    // ดึงวันที่ทั้งหมดจาก onetData และเรียงลำดับ
+    const allDates = Object.keys(onetData).sort((a, b) => dateKeyToDate(a) - dateKeyToDate(b)); //
+
+    if (allDates.length === 0) {
+        onetOverviewNoDataEl.textContent = 'ไม่พบข้อมูลตารางติวในระบบ';
+        onetOverviewNoDataEl.classList.remove('hidden');
+        return;
+    }
+
+    allDates.forEach(dateKey => {
+        const dayOfWeek = getDayOfWeek(dateKey).replace('วัน', ''); // 'จันทร์', 'อังคาร', ...
+        const sessions = onetData[dateKey]; //
+
+        // ค้นหาข้อมูลติวในแต่ละช่วง
+        const p6_m = sessions.find(s => s.grade === 'ป.6' && s.periods[0] < 4);
+        const p6_a = sessions.find(s => s.grade === 'ป.6' && s.periods[0] >= 4);
+        const m3_m = sessions.find(s => s.grade === 'ม.3' && s.periods[0] < 4);
+        const m3_a = sessions.find(s => s.grade === 'ม.3' && s.periods[0] >= 4);
+
+        // ฟังก์ชันช่วยจัดรูปแบบช่อง
+        const formatCell = (session) => {
+            if (!session) return '<span class="text-slate-400">—</span>';
+            return `<span class="text-sm font-medium">${session.subject}</span><br><span class="text-xs text-slate-600">(${session.teacher})</span>`;
+        };
+
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50";
+        tr.innerHTML = `
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-700">${dateKey}</td>
+            <td class="px-2 py-3 whitespace-nowrap text-center text-sm text-slate-700">${dayOfWeek}</td>
+            <td class="px-4 py-3 whitespace-nowrap">${formatCell(p6_m)}</td>
+            <td class="px-4 py-3 whitespace-nowrap">${formatCell(p6_a)}</td>
+            <td class="px-4 py-3 whitespace-nowrap">${formatCell(m3_m)}</td>
+            <td class="px-4 py-3 whitespace-nowrap">${formatCell(m3_a)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // เก็บ HTML ไว้ใน cache และแสดงผล
+    onetOverviewTableHTML = table.outerHTML;
+    onetOverviewDetails.appendChild(table);
+}
+
         // Main function to generate and render both schedules
         function generateAndRenderAllSchedules() {
             const selectedDateValue = datePicker.value;
@@ -1810,6 +1934,52 @@ function renderWorkloadSummary(summaryData) {
 
             renderTeacherSchedule(currentFullSchedule);
             renderStudentSchedule(currentFullSchedule);
+        }
+		
+		// --- ฟังก์ชันสำหรับหมุนวนตารางติว (เพิ่มใหม่) ---
+        function applyRotation(newIndex) {
+            // 1. คำนวณ Index ใหม่ (วนลูป 0, 1, 2, 3)
+            currentRotationIndex = (newIndex + 4) % 4; 
+            
+            // 2. อัปเดตข้อความแสดงสถานะ
+            document.getElementById('rotation-status').textContent = `รูปแบบ ${currentRotationIndex + 1} / 4`;
+
+            // 3. สร้างข้อมูล onetData ชุดใหม่ตามการหมุน
+            const newOnetData = {};
+            onetDateKeys.forEach((dateKey, index) => {
+                const originalPatternIndex = index % 4; // วันที่นี้ควรจะเป็นรูปแบบที่เท่าไหร่ (0-3)
+                const rotatedPatternIndex = (originalPatternIndex + currentRotationIndex) % 4; // รูปแบบใหม่ที่ถูกหมุนมา
+                
+                newOnetData[dateKey] = onetSchedulePatterns[rotatedPatternIndex];
+            });
+
+            // 4. สลับข้อมูล O-NET ให้เป็นชุดใหม่
+            onetData = newOnetData;
+
+            // 5. ล้าง Cache ข้อมูลเก่าทิ้ง
+            workloadSummaryData = null;     //
+            onetOverviewTableHTML = null;   //
+
+            // 6. สั่ง Render แท็บรายวัน (สอนแทน, นักเรียน) ใหม่
+            generateAndRenderAllSchedules();
+
+            // 7. สั่ง Render แท็บสรุป/ภาพรวม (ถ้ากำลังเปิดอยู่)
+            const activeTab = document.querySelector('.tab-button.active');
+            if (activeTab) {
+                const activeTabId = activeTab.getAttribute('data-tab');
+                
+                if (activeTabId === 'summary') {
+                    // บังคับคำนวณและแสดงผลแท็บสรุปใหม่
+                    summaryHeaderEl.textContent = 'กำลังคำนวณข้อมูลสรุป...';
+                    setTimeout(() => { // ใช้ setTimeout เพื่อให้ UI "กำลังคำนวณ" แสดงผลก่อน
+                        workloadSummaryData = calculateWorkloadSummary("10/11/2568", "30/01/2569"); //
+                        renderWorkloadSummary(workloadSummaryData); //
+                    }, 50);
+                } else if (activeTabId === 'onet-overview') {
+                    // บังคับแสดงผลแท็บภาพรวมตารางติวใหม่
+                    renderOnetOverviewTable(); //
+                }
+            }
         }
 
         // --- Tab Switching Logic ---
@@ -1838,34 +2008,58 @@ tabButtons.forEach(button => {
                     workloadSummaryData = calculateWorkloadSummary("10/11/2568", "30/01/2569");
                     renderWorkloadSummary(workloadSummaryData);
                 }, 50); // 50ms delay
-            } else {
-                // If data is already cached, just re-render it
-                renderWorkloadSummary(workloadSummaryData);
+} else {
+                    // If data is already cached, just re-render it
+                    renderWorkloadSummary(workloadSummaryData);
+                }
+            } else if (tabId === 'onet-overview') {
+                // ฟังก์ชันนี้จัดการ cache ของตัวเอง
+                renderOnetOverviewTable();
             }
-        }
+        });
     });
-});
 
 
         // --- Event Listeners ---
         datePicker.addEventListener('change', generateAndRenderAllSchedules);
-
+		prevRotationBtn.addEventListener('click', () => applyRotation(currentRotationIndex - 1));
+        nextRotationBtn.addEventListener('click', () => applyRotation(currentRotationIndex + 1));
         exportBtn.addEventListener('click', async () => {
              // Target the *currently active tab's content* for export
              const activeTabContent = document.querySelector('.tab-content.active');
              // Determine which no-data element corresponds to the active tab
-const isActiveTabTeacher = activeTabContent.id === 'teacher-schedule-content';
-const isActiveTabStudent = activeTabContent.id === 'student-schedule-content';
-const isActiveTabSummary = activeTabContent.id === 'summary-content';
+// Determine which no-data element corresponds to the active tab
+let exportFileNamePrefix = 'ตาราง';
+            let noDataCheckElement = null;
+            let scheduleCheck = currentFullSchedule; // ค่าเริ่มต้นสำหรับเช็คข้อมูล
 
-const noDataElement = isActiveTabTeacher ? teacherNoDataEl : (isActiveTabStudent ? studentNoDataEl : summaryNoDataEl);
-const exportFileNamePrefix = isActiveTabTeacher ? 'ตารางสอนแทน' : (isActiveTabStudent ? 'ตารางเรียน' : 'สรุปชั่วโมงสอน');
+            if (activeTabContent.id === 'teacher-schedule-content') {
+                exportFileNamePrefix = 'ตารางสอนแทน';
+                noDataCheckElement = teacherNoDataEl;
+            } else if (activeTabContent.id === 'student-schedule-content') {
+                exportFileNamePrefix = 'ตารางเรียน';
+                noDataCheckElement = studentNoDataEl;
+            } else if (activeTabContent.id === 'summary-content') {
+                exportFileNamePrefix = 'สรุปชั่วโมงสอน';
+                noDataCheckElement = summaryNoDataEl;
+                scheduleCheck = workloadSummaryData; // เปลี่ยนไปเช็ค cache ของ summary
+            } else if (activeTabContent.id === 'onet-overview-content') {
+                exportFileNamePrefix = 'ภาพรวมตารางติว';
+                noDataCheckElement = onetOverviewNoDataEl;
+                scheduleCheck = onetOverviewTableHTML; // เปลี่ยนไปเช็ค cache ของ overview
+            }
 
-
-             if (!activeTabContent || !currentFullSchedule || noDataElement.offsetParent !== null ) { // Check if noDataElement is visible
-                 showToast(`ไม่มี${exportFileNamePrefix}ให้ Export`);
-                 return;
-             }
+            // ตรวจสอบว่าข้อมูลของแท็บนั้นโหลดมาหรือยัง
+            if (!scheduleCheck) {
+                showToast(`ไม่มี${exportFileNamePrefix}ให้ Export (ยังไม่โหลด)`);
+                return;
+            }
+            
+            // ตรวจสอบว่าแท็บนั้นแสดง "ไม่มีข้อมูล" หรือไม่
+            if (noDataCheckElement && noDataCheckElement.offsetParent !== null ) { 
+                showToast(`ไม่มี${exportFileNamePrefix}ให้ Export (ไม่มีข้อมูล)`);
+                return;
+            }
 
             try {
                 const canvas = await html2canvas(activeTabContent, { // Capture the active tab content
@@ -1885,20 +2079,41 @@ const exportFileNamePrefix = isActiveTabTeacher ? 'ตารางสอนแ�
         });
 
         shareBtn.addEventListener('click', async () => {
-             // Target the *currently active tab's content* for sharing
+// Target the *currently active tab's content* for sharing
              const activeTabContent = document.querySelector('.tab-content.active');
-const isActiveTabTeacher = activeTabContent.id === 'teacher-schedule-content';
-const isActiveTabStudent = activeTabContent.id === 'student-schedule-content';
-const isActiveTabSummary = activeTabContent.id === 'summary-content';
+            const dateValue = datePicker.value; // เก็บไว้ใช้
+            
+            let shareTitlePrefix = 'ตาราง';
+            let noDataCheckElement = null;
+            let scheduleCheck = currentFullSchedule; // ค่าเริ่มต้นสำหรับเช็คข้อมูล
 
-const noDataElement = isActiveTabTeacher ? teacherNoDataEl : (isActiveTabStudent ? studentNoDataEl : summaryNoDataEl);
-const shareTitlePrefix = isActiveTabTeacher ? 'ตารางสอนแทน' : (isActiveTabStudent ? 'ตารางเรียน' : 'สรุปชั่วโมงสอน');
+            if (activeTabContent.id === 'teacher-schedule-content') {
+                shareTitlePrefix = 'ตารางสอนแทน';
+                noDataCheckElement = teacherNoDataEl;
+            } else if (activeTabContent.id === 'student-schedule-content') {
+                shareTitlePrefix = 'ตารางเรียน';
+                noDataCheckElement = studentNoDataEl;
+            } else if (activeTabContent.id === 'summary-content') {
+                shareTitlePrefix = 'สรุปชั่วโมงสอน';
+                noDataCheckElement = summaryNoDataEl;
+                scheduleCheck = workloadSummaryData; // เปลี่ยนไปเช็ค cache ของ summary
+            } else if (activeTabContent.id === 'onet-overview-content') {
+                shareTitlePrefix = 'ภาพรวมตารางติว';
+                noDataCheckElement = onetOverviewNoDataEl;
+                scheduleCheck = onetOverviewTableHTML; // เปลี่ยนไปเช็ค cache ของ overview
+            }
 
-
-             if (!activeTabContent || !currentFullSchedule || noDataElement.offsetParent !== null) { // Check visibility
-                 showToast(`ไม่มี${shareTitlePrefix}ให้แชร์`);
-                 return;
-             }
+            // ตรวจสอบว่าข้อมูลของแท็บนั้นโหลดมาหรือยัง
+            if (!scheduleCheck) {
+                showToast(`ไม่มี${shareTitlePrefix}ให้แชร์ (ยังไม่โหลด)`);
+                return;
+            }
+            
+            // ตรวจสอบว่าแท็บนั้นแสดง "ไม่มีข้อมูล" หรือไม่
+            if (noDataCheckElement && noDataCheckElement.offsetParent !== null ) { 
+                showToast(`ไม่มี${shareTitlePrefix}ให้แชร์ (ไม่มีข้อมูล)`);
+                return;
+            }
 
              try {
                 const canvas = await html2canvas(activeTabContent, { // Capture active tab
