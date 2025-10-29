@@ -105,6 +105,12 @@
                 <button id="share-btn" class="action-button share-button w-full sm:w-auto">
                    <i class="fas fa-share-square mr-2"></i> แชร์ตารางเรียน
                 </button>
+				<button id="export-combined-btn" class="action-button bg-purple-600 hover:bg-purple-700 focus:ring-purple-300 w-full sm:w-auto mt-3 sm:mt-0 sm:ml-4">
+                    <i class="fas fa-images mr-2"></i> Export ภาพพิเศษ (รวม)
+                </button>
+				<button id="share-combined-btn" class="action-button bg-teal-600 hover:bg-teal-700 focus:ring-teal-300 w-full sm:w-auto mt-3 sm:mt-0 sm:ml-4">
+                    <i class="fas fa-share-alt mr-2"></i> แชร์ภาพพิเศษ (รวม)
+                </button>
             </div>
 
 <div class="mt-8 text-center">
@@ -1201,6 +1207,56 @@
                 { period: 6, subject: 'PLC', grade: null }
               ]
             }
+          },
+		  {
+            name: 'รองอัจฉรา มาอินทร์',
+            type: 'general', // กำหนด type เป็น general
+            // ระบุระดับชั้นที่สอนได้ (ครอบคลุมทุกระดับตามวิชาแนะแนว)
+            canTeachGrades: ['ป.1', 'ป.2', 'ป.3', 'ป.4', 'ป.5', 'ป.6', 'ม.1', 'ม.2', 'ม.3'],
+            canTeachSpecial: null,
+            schedule: {
+              'วันจันทร์': [
+                { period: 1, subject: 'แนะแนว', grade: 'ป.3' },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: 'แนะแนว', grade: 'ป.1' },
+                { period: 5, subject: 'แนะแนว', grade: 'ป.2' },
+                { period: 6, subject: null, grade: null }
+              ],
+              'วันอังคาร': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'แนะแนว', grade: 'ป.6' }
+              ],
+              'วันพุธ': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: null, grade: null },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'ลูกเสือ', grade: null } // ใส่ ลูกเสือ
+              ],
+              'วันพฤหัสบดี': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: 'แนะแนว', grade: 'ม.1' },
+                { period: 5, subject: null, grade: null },
+                { period: 6, subject: 'ชุมนุม', grade: null } // ใส่ ชุมนุม
+              ],
+              'วันศุกร์': [
+                { period: 1, subject: null, grade: null },
+                { period: 2, subject: null, grade: null },
+                { period: 3, subject: null, grade: null },
+                { period: 4, subject: 'แนะแนว', grade: 'ป.4' },
+                { period: 5, subject: 'แนะแนว', grade: 'ป.5' },
+                // รวม ม.2 และ ม.3 - ใช้แค่ ม.2 หรือ ม.3 ก็ได้ เพราะไม่มีผลกับการคำนวณคาบว่าง
+                { period: 6, subject: 'แนะแนว', grade: 'ม.2' }
+              ]
+            }
           }
         ];
 
@@ -1419,6 +1475,10 @@ function parseGradeToNumber(grade) {
 
                      for (const potentialSub of allTeacherData) {
                         if (potentialSub.name === tutorName) continue; // Cannot sub self
+						
+						if (potentialSub.name === 'รองอัจฉรา มาอินทร์') {
+                            continue; // ข้ามรองอัจฉราไปเลยในการค้นหาปกติ
+                        }
 
                         // Check 1: Is teacher busy with O-NET or already subbing?
                         if (isTeacherTutoring(potentialSub.name, period, onetDaySchedule) || (substitutionsMade[period] && substitutionsMade[period].includes(potentialSub.name))) {
@@ -1490,6 +1550,16 @@ function parseGradeToNumber(grade) {
                         // Case 3: No one is vacant.
                         reason = 'หาคนสอนแทนไม่ได้ (ทุกครูติดสอน/ติว)';
                     }
+					
+					// --- !!! เงื่อนไข Override พิเศษ !!! ---
+                    if (bestSubName === 'ครูวิภาวัลย์ นันท์มนัส') {
+                        const rorAcharraName = 'รองอัจฉรา มาอินทร์';
+                        console.log(`Override: Changing sub from ครูวิภาวัลย์ to ${rorAcharraName} for period ${period}, class ${grade}/${subject}`);
+                        bestSubName = rorAcharraName; // บังคับเปลี่ยนเป็น รองอัจฉรา
+                        // อัปเดตเหตุผล (ไม่จำเป็นต้องคำนวณ workload ใหม่ตรงนี้)
+                        reason = `มอบหมายพิเศษ (รองฯ แทน ครูวิภาวัลย์)`;
+                    }
+                    // --- !!! จบเงื่อนไข Override !!! ---
 
                     // --- Record the assignment (or failure) ---
                     scheduleEntry.substitutions.push({
@@ -1567,16 +1637,18 @@ function parseGradeToNumber(grade) {
 		
 		// --- CORE WORKLOAD SUMMARY LOGIC ---
 
+// --- CORE WORKLOAD SUMMARY LOGIC (แก้ไขล่าสุด) ---
+
 function calculateWorkloadSummary(startDateKey, endDateKey) {
     const summary = {};
-    const startDate = dateKeyToDate(startDateKey);
-    const endDate = dateKeyToDate(endDateKey);
+    const startDate = dateKeyToDate(startDateKey); //
+    const endDate = dateKeyToDate(endDateKey); //
 
     // 1. Initialize summary object for all teachers
     allTeacherData.forEach(teacher => {
         summary[teacher.name] = {
             name: teacher.name,
-            type: teacher.type,
+            type: teacher.type, //
             normal: 0,
             sub: 0,
             onet: 0,
@@ -1586,12 +1658,12 @@ function calculateWorkloadSummary(startDateKey, endDateKey) {
 
     // 2. Iterate through all dates in onetData
     for (const dateKey in onetData) {
-        const currentDate = dateKeyToDate(dateKey);
+        const currentDate = dateKeyToDate(dateKey); //
 
         // Check if the date is within the specified range
         if (currentDate >= startDate && currentDate <= endDate) {
-            const dayOfWeek = getDayOfWeek(dateKey);
-            const onetDaySchedule = onetData[dateKey];
+            const dayOfWeek = getDayOfWeek(dateKey); //
+            const onetDaySchedule = onetData[dateKey]; //
 
             if (!dayOfWeek || !onetDaySchedule) continue; // Skip if no schedule or invalid day
 
@@ -1603,48 +1675,67 @@ function calculateWorkloadSummary(startDateKey, endDateKey) {
             });
 
             // 4. Calculate Substitute hours (by running the daily schedule generator)
-            const dailySchedules = generateSchedules(dateKey);
+            // and build lookup for substitute check
+            const dailySchedules = generateSchedules(dateKey); //
+
+            // --- สร้าง Lookup สำหรับตรวจสอบว่าใครสอนแทนคาบไหนในวันนี้ ---
+            const subsLookup = {}; // Format: { 1: ["TeacherA"], 2: ["TeacherB", "TeacherC"], ... }
             dailySchedules.teacherSchedule.forEach(tutorEntry => {
                 tutorEntry.substitutions.forEach(sub => {
-                    if (sub.subTeacher && summary[sub.subTeacher]) {
-                        summary[sub.subTeacher].sub += 1; // 1 sub assignment = 1 hour
+                    if (sub.subTeacher) {
+                        if (!subsLookup[sub.period]) {
+                            subsLookup[sub.period] = [];
+                        }
+                        subsLookup[sub.period].push(sub.subTeacher);
+
+                        // นับชั่วโมงสอนแทนใน summary object ด้วย
+                        if (summary[sub.subTeacher]) {
+                             summary[sub.subTeacher].sub += 1;
+                        }
                     }
                 });
             });
+            // --- จบส่วนสร้าง Lookup ---
 
-            // 5. Calculate Normal hours (excluding P.6, M.3, and own tutoring time)
+            // 5. Calculate Normal hours (excluding P.6, M.3, own tutoring, and substitute teaching)
             allTeacherData.forEach(teacher => {
                 const teacherName = teacher.name;
                 const normalSchedule = teacher.schedule[dayOfWeek];
-                if (!normalSchedule) return;
+                if (!normalSchedule) return; // Corrected from continue
 
                 for (let period = 1; period <= 6; period++) {
                     const cls = normalSchedule.find(s => s.period === period);
 
-                    if (!cls || !cls.subject || !cls.grade || EXCLUDED_SUBJECTS.includes(cls.subject)) {
+                    if (!cls || !cls.subject || !cls.grade || EXCLUDED_SUBJECTS.includes(cls.subject)) { //
                         continue; // Skip if no class, no subject, or excluded subject
                     }
 
                     // --- APPLY EXCLUSION RULES ---
 
-                    // Rule 1: Exclude if teacher is tutoring at this time
-                    if (isTeacherTutoring(teacherName, period, onetDaySchedule)) {
-                        continue; 
+                    // Rule 1: Exclude if teacher is tutoring O-NET at this time
+                    if (isTeacherTutoring(teacherName, period, onetDaySchedule)) { //
+                        continue;
                     }
 
                     // Rule 2: Exclude if the class is P.6 or M.3 (students are at O-NET)
-                    if (cls.grade === 'ป.6' || cls.grade === 'ม.3') {
+                    if (cls.grade === 'ป.6' || cls.grade === 'ม.3') { //
                         continue;
                     }
+
+                    // --- !!! กฎใหม่: Exclude if teacher is substituting at this time !!! ---
+                    if (subsLookup[period] && subsLookup[period].includes(teacherName)) {
+                        continue; // ข้ามการนับชั่วโมงปกติ เพราะกำลังสอนแทนอยู่
+                    }
+                    // --- !!! จบกฎใหม่ !!! ---
 
                     // If all checks pass, it's a valid normal teaching hour
                     summary[teacherName].normal += 1;
                 }
-            });
-        }
-    }
+            }); // End allTeacherData.forEach
+        } // End date range check
+    } // End loop through onetData
 
-    // 6. Calculate totals
+    // 6. Calculate totals (ย้ายการคำนวณ .sub ออกไปแล้ว)
     const summaryArray = Object.values(summary).map(teacher => {
         teacher.total = teacher.normal + teacher.sub + teacher.onet;
         return teacher;
@@ -1652,8 +1743,8 @@ function calculateWorkloadSummary(startDateKey, endDateKey) {
 
     // 7. Sort the array: Tutors first, then by total hours
     summaryArray.sort((a, b) => {
-        if (a.type === 'tutor' && b.type !== 'tutor') return -1;
-        if (a.type !== 'tutor' && b.type === 'tutor') return 1;
+        if (a.type === 'tutor' && b.type !== 'tutor') return -1; //
+        if (a.type !== 'tutor' && b.type === 'tutor') return 1; //
         return b.total - a.total; // Sort by total descending
     });
 
@@ -1684,6 +1775,8 @@ const onetOverviewNoDataEl = document.getElementById('onet-overview-nodata');
 const prevRotationBtn = document.getElementById('prev-rotation-btn');
 const nextRotationBtn = document.getElementById('next-rotation-btn');
 const rotationStatus = document.getElementById('rotation-status');
+const exportCombinedBtn = document.getElementById('export-combined-btn');
+const shareCombinedBtn = document.getElementById('share-combined-btn');
         // Action buttons & Toast
         const exportBtn = document.getElementById('export-btn');
         const shareBtn = document.getElementById('share-btn');
@@ -2037,6 +2130,239 @@ tabButtons.forEach(button => {
         datePicker.addEventListener('change', generateAndRenderAllSchedules);
 		prevRotationBtn.addEventListener('click', () => applyRotation(currentRotationIndex - 1));
         nextRotationBtn.addEventListener('click', () => applyRotation(currentRotationIndex + 1));
+// --- Event Listener สำหรับ Export ภาพรวม (แก้ไข) ---
+        exportCombinedBtn.addEventListener('click', async () => {
+            const selectedDateValue = datePicker.value;
+            const dateKey = formatDateToKey(selectedDateValue); //
+
+            if (!currentFullSchedule || (!currentFullSchedule.teacherSchedule.length && !Object.values(currentFullSchedule.studentScheduleByGrade).some(g => g.filter(cls => cls.isSubstitute).length > 0))) {
+                 showToast(`ไม่มีข้อมูลตารางเรียน/สอนแทนสำหรับ Export ในวันนี้`);
+                 return;
+            }
+
+            // --- สร้าง Container ชั่วคราว (Off-screen) ---
+            const tempContainer = document.createElement('div');
+            tempContainer.style.position = 'absolute';
+            tempContainer.style.left = '-9999px';
+            tempContainer.style.width = '896px';
+            tempContainer.style.padding = '32px';
+            tempContainer.style.backgroundColor = '#ffffff';
+            tempContainer.className = 'bg-white p-8'; // ใช้ class Tailwind
+
+            // --- *** สร้างหัวข้อหลักเพียงอันเดียว *** ---
+            const mainHeader = document.createElement('h3');
+            mainHeader.className = "text-2xl font-bold text-center text-indigo-700 mb-6";
+            // ดึงข้อความวันที่จาก Header ไหนก็ได้ (เช่น studentHeaderEl) มาใช้
+            // หรือจะสร้างข้อความใหม่จาก currentFullSchedule ก็ได้
+            mainHeader.innerHTML = `📅 ตารางเรียนและผลการสอนแทน ${currentFullSchedule.dayOfWeekText} ${currentFullSchedule.fullDateText}`; //
+            tempContainer.appendChild(mainHeader);
+            // --- *** จบส่วนหัวข้อหลัก *** ---
+
+// --- 1. เพิ่มส่วนตารางเรียน (นักเรียน) - เพิ่ม Header ย่อย ---
+            const studentHeaderSub = document.createElement('h3');
+            studentHeaderSub.className = "text-xl font-semibold text-blue-800 mb-4 mt-6"; // เพิ่ม mt-6 เพื่อเว้นระยะจากหัวข้อหลัก
+            studentHeaderSub.innerHTML = `🧑‍🎓 ตารางเรียน (เฉพาะคาบที่มีการสอนแทน)`;
+            tempContainer.appendChild(studentHeaderSub);
+            // --- จบการเพิ่ม Header ย่อย ---
+
+            // --- 1. เพิ่มส่วนตารางเรียน (นักเรียน) - ไม่มี Header แล้ว ---
+            const studentSubs = Object.values(currentFullSchedule.studentScheduleByGrade).flatMap(g => g.filter(cls => cls.isSubstitute));
+            if (studentSubs.length > 0) {
+                 // Clone เฉพาะส่วน Details
+                 const studentDetailsClone = studentScheduleDetails.cloneNode(true); //
+                 studentDetailsClone.id = ''; // ลบ ID
+                 tempContainer.appendChild(studentDetailsClone);
+            } else {
+                 const noStudentData = document.createElement('p');
+                 noStudentData.className = "text-center text-slate-500 text-xl font-medium py-8 border rounded-lg bg-blue-50 border-blue-200"; // เพิ่ม Style เล็กน้อย
+                 noStudentData.textContent = "ไม่มีคาบเรียนที่มีการสอนแทนในวันนี้";
+                 tempContainer.appendChild(noStudentData);
+            }
+
+            // --- เพิ่มเส้นคั่น ถ้ามีทั้งสองส่วน ---
+            if (studentSubs.length > 0 && currentFullSchedule.teacherSchedule.length > 0) {
+                 const hr = document.createElement('hr');
+                 hr.className = 'mt-4 mb-8';
+                 tempContainer.appendChild(hr);
+            } else {
+                 // ถ้ามีแค่ส่วนเดียว ให้เพิ่มระยะห่างด้านล่างแทนเส้นคั่น
+                 tempContainer.lastChild.classList.add('mb-8');
+            }
+
+// --- 2. เพิ่มส่วนตารางสอนแทน (ครู) - เพิ่ม Header ย่อย ---
+            const teacherHeaderSub = document.createElement('h3');
+            teacherHeaderSub.className = "text-xl font-semibold text-indigo-800 mb-4"; // ไม่ต้องมี mt-6 เพราะมี hr หรือ mb-8 คั่นอยู่แล้ว
+            teacherHeaderSub.innerHTML = `👩‍🏫 ผลการจัดตารางสอนแทน`;
+            tempContainer.appendChild(teacherHeaderSub);
+            // --- จบการเพิ่ม Header ย่อย ---
+
+            // --- 2. เพิ่มส่วนตารางสอนแทน (ครู) - ไม่มี Header แล้ว ---
+            if (currentFullSchedule.teacherSchedule.length > 0) {
+                // Clone เฉพาะส่วน Details
+                const teacherDetailsClone = teacherScheduleDetails.cloneNode(true); //
+                teacherDetailsClone.id = ''; // ลบ ID
+                tempContainer.appendChild(teacherDetailsClone);
+            } else {
+                 const noTeacherData = document.createElement('p');
+                 noTeacherData.className = "text-center text-slate-500 text-xl font-medium py-8 border rounded-lg bg-slate-50 border-slate-200"; // เพิ่ม Style เล็กน้อย
+                 noTeacherData.textContent = "ไม่มีการติว O-NET หรือไม่มีคาบสอนแทนในวันนี้";
+                 tempContainer.appendChild(noTeacherData);
+            }
+
+            // --- เพิ่ม Container ชั่วคราวลงใน DOM ---
+            document.body.appendChild(tempContainer);
+
+            // --- 3. ใช้ html2canvas จับภาพ ---
+            try {
+                await new Promise(resolve => setTimeout(resolve, 100)); // รอ render
+
+                const canvas = await html2canvas(tempContainer, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff'
+                });
+                const link = document.createElement('a');
+                link.download = `ตารางรวม-${selectedDateValue}.jpg`;
+                link.href = canvas.toDataURL('image/jpeg', 0.95);
+                link.click();
+
+            } catch (err) {
+                console.error("Error exporting combined image:", err);
+                showToast('เกิดข้อผิดพลาดในการ Export รูปภาพรวม');
+            } finally {
+                // --- 4. ลบ Container ชั่วคราว ---
+                document.body.removeChild(tempContainer);
+            }
+        });
+        // --- สิ้นสุด Event Listener ---
+		
+		shareCombinedBtn.addEventListener('click', async () => {
+            const selectedDateValue = datePicker.value;
+            const dateKey = formatDateToKey(selectedDateValue); //
+
+            if (!currentFullSchedule || (!currentFullSchedule.teacherSchedule.length && !Object.values(currentFullSchedule.studentScheduleByGrade).some(g => g.filter(cls => cls.isSubstitute).length > 0))) {
+                 showToast(`ไม่มีข้อมูลตารางเรียน/สอนแทนสำหรับแชร์ในวันนี้`);
+                 return;
+            }
+
+            // --- สร้าง Container ชั่วคราว (เหมือน Export) ---
+            const tempContainer = document.createElement('div');
+            tempContainer.style.position = 'absolute';
+            tempContainer.style.left = '-9999px';
+            tempContainer.style.width = '896px';
+            tempContainer.style.padding = '32px';
+            tempContainer.style.backgroundColor = '#ffffff';
+            tempContainer.className = 'bg-white p-8';
+
+            // --- สร้างหัวข้อหลัก (เหมือน Export) ---
+            const mainHeader = document.createElement('h3');
+            mainHeader.className = "text-2xl font-bold text-center text-indigo-700 mb-6";
+            mainHeader.innerHTML = `📅 ตารางเรียนและผลการสอนแทน ${currentFullSchedule.dayOfWeekText} ${currentFullSchedule.fullDateText}`; //
+            tempContainer.appendChild(mainHeader);
+
+            // --- เพิ่มหัวข้อย่อยและส่วนตารางเรียน (เหมือน Export) ---
+            const studentHeaderSub = document.createElement('h3');
+            studentHeaderSub.className = "text-xl font-semibold text-blue-800 mb-4 mt-6";
+            studentHeaderSub.innerHTML = `🧑‍🎓 ตารางเรียน (เฉพาะคาบที่มีการสอนแทน)`;
+            tempContainer.appendChild(studentHeaderSub);
+            const studentSubs = Object.values(currentFullSchedule.studentScheduleByGrade).flatMap(g => g.filter(cls => cls.isSubstitute));
+            if (studentSubs.length > 0) {
+                 const studentDetailsClone = studentScheduleDetails.cloneNode(true); //
+                 studentDetailsClone.id = '';
+                 tempContainer.appendChild(studentDetailsClone);
+            } else {
+                 const noStudentData = document.createElement('p');
+                 noStudentData.className = "text-center text-slate-500 text-xl font-medium py-8 border rounded-lg bg-blue-50 border-blue-200";
+                 noStudentData.textContent = "ไม่มีคาบเรียนที่มีการสอนแทนในวันนี้";
+                 tempContainer.appendChild(noStudentData);
+            }
+
+            // --- เพิ่มเส้นคั่น (เหมือน Export) ---
+            if (studentSubs.length > 0 && currentFullSchedule.teacherSchedule.length > 0) {
+                 const hr = document.createElement('hr');
+                 hr.className = 'mt-4 mb-8'; // ใช้ margin ที่ปรับแล้ว
+                 tempContainer.appendChild(hr);
+            } else {
+                 tempContainer.lastChild.classList.add('mb-8');
+            }
+
+            // --- เพิ่มหัวข้อย่อยและส่วนตารางสอนแทน (เหมือน Export) ---
+            const teacherHeaderSub = document.createElement('h3');
+            teacherHeaderSub.className = "text-xl font-semibold text-indigo-800 mb-4";
+            teacherHeaderSub.innerHTML = `👩‍🏫 ผลการจัดตารางสอนแทน`;
+            tempContainer.appendChild(teacherHeaderSub);
+            if (currentFullSchedule.teacherSchedule.length > 0) {
+                const teacherDetailsClone = teacherScheduleDetails.cloneNode(true); //
+                teacherDetailsClone.id = '';
+                tempContainer.appendChild(teacherDetailsClone);
+            } else {
+                 const noTeacherData = document.createElement('p');
+                 noTeacherData.className = "text-center text-slate-500 text-xl font-medium py-8 border rounded-lg bg-slate-50 border-slate-200";
+                 noTeacherData.textContent = "ไม่มีการติว O-NET หรือไม่มีคาบสอนแทนในวันนี้";
+                 tempContainer.appendChild(noTeacherData);
+            }
+
+            // --- เพิ่ม Container ชั่วคราวลงใน DOM ---
+            document.body.appendChild(tempContainer);
+
+            // --- *** ใช้ html2canvas และ Web Share API *** ---
+            try {
+                await new Promise(resolve => setTimeout(resolve, 100)); // รอ render
+
+                const canvas = await html2canvas(tempContainer, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff'
+                });
+
+                // แปลง canvas เป็น Blob
+                canvas.toBlob(async (blob) => {
+                    if (!blob) {
+                        showToast('ไม่สามารถสร้างรูปภาพสำหรับแชร์ได้');
+                        document.body.removeChild(tempContainer); // Clean up
+                        return;
+                    }
+                    const fileName = `ตารางรวม-${selectedDateValue}.jpg`;
+                    const file = new File([blob], fileName, { type: 'image/jpeg' });
+                    const shareData = {
+                        files: [file],
+                        title: `ตารางรวมวันที่ ${selectedDateValue}`,
+                        text: `ตารางเรียนและสอนแทนวันที่ ${selectedDateValue}`,
+                    };
+
+                    // ตรวจสอบว่าแชร์ได้ไหม
+                    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+                        try {
+                            await navigator.share(shareData);
+                            console.log('Combined image shared successfully');
+                        } catch (err) {
+                            if (err.name !== 'AbortError') {
+                                console.error('Share failed:', err.message);
+                                showToast('การแชร์ไม่สำเร็จ กรุณาลอง Export แล้วแชร์ด้วยตนเอง');
+                            } else {
+                                console.log('Share cancelled by user');
+                            }
+                        }
+                    } else {
+                        console.warn('Cannot share files according to navigator.canShare or API not supported');
+                        showToast('เบราว์เซอร์ไม่รองรับการแชร์ไฟล์รูปภาพโดยตรง กรุณาลอง Export แล้วแชร์ด้วยตนเอง');
+                    }
+                     // --- ลบ Container ชั่วคราว (หลังจากแชร์เสร็จ) ---
+                    document.body.removeChild(tempContainer);
+
+                }, 'image/jpeg', 0.9); // คุณภาพ 90%
+
+            } catch (err) {
+                console.error("Error generating or sharing combined image:", err);
+                showToast('เกิดข้อผิดพลาดในการสร้างภาพสำหรับแชร์');
+                 // --- ลบ Container ชั่วคราว (กรณีเกิด Error) ---
+                if (document.body.contains(tempContainer)) {
+                    document.body.removeChild(tempContainer);
+                }
+            }
+            // ไม่ต้องมี finally เพราะการลบ container ถูกจัดการใน toBlob callback แล้ว
+        });
+		
         exportBtn.addEventListener('click', async () => {
              // Target the *currently active tab's content* for export
              const activeTabContent = document.querySelector('.tab-content.active');
