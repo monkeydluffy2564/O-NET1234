@@ -1554,7 +1554,7 @@ function generateSchedules(dateKey) {
                 const rorAcharraName = 'รองอัจฉรา มาอินทร์'; //
                 console.log(`Override: Changing sub from ครูวิภาวัลย์ to ${rorAcharraName} for period ${period}, class ${grade}/${subject}`);
                 bestSubName = rorAcharraName;
-                reason = `มอบหมายพิเศษ (รองฯ แทน ครูวิภาวัลย์)`; // Update reason for clarity
+                reason = `มอบหมายพิเศษ`; // Update reason for clarity
                 // Recalculate newWorkload for รองอัจฉรา (optional, but good practice)
                 if (teacherWorkloads[rorAcharraName]) {
                     newWorkload = teacherWorkloads[rorAcharraName].total + 1;
