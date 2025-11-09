@@ -14,6 +14,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         body {
             font-family: 'Sarabun', sans-serif;
@@ -111,6 +113,12 @@
 				<button id="share-combined-btn" class="action-button bg-teal-600 hover:bg-teal-700 focus:ring-teal-300 w-full sm:w-auto mt-3 sm:mt-0 sm:ml-4">
                     <i class="fas fa-share-alt mr-2"></i> แชร์ภาพพิเศษ (รวม)
                 </button>
+				<button id="export-all-teachers-zip-btn" class="action-button bg-red-600 hover:bg-red-700 focus:ring-red-300 w-full sm:w-auto mt-3 sm:mt-0 sm:ml-4">
+                    <i class="fas fa-file-archive mr-2"></i> Export ทั้งหมด (ZIP)
+                </button>
+				<button id="export-all-students-zip-btn" class="action-button bg-cyan-600 hover:bg-cyan-700 focus:ring-cyan-300 w-full sm:w-auto mt-3 sm:mt-0 sm:ml-4">
+                <i class="fas fa-file-archive mr-2"></i> Export ตารางเรียน (ZIP)
+            </button>
             </div>
 
 <div class="mt-8 text-center">
@@ -143,6 +151,12 @@
     </button>
 		<button id="tab-substitute-summary" class="tab-button" data-tab="substitute-summary-schedule">
         <i class="fas fa-user-clock mr-2"></i> สรุปการสอนแทน
+    </button>
+	<button id="tab-teacher-detail" class="tab-button" data-tab="teacher-detail-schedule">
+        <i class="fas fa-user-shield mr-2"></i> ตารางสอนรายบุคคล
+    </button>
+	<button id="tab-student-detail" class="tab-button" data-tab="student-detail-schedule">
+        <i class="fas fa-school mr-2"></i> ตารางเรียนรายชั้น
     </button>
     <button id="tab-summary" class="tab-button" data-tab="summary">
         <i class="fas fa-chart-bar mr-2"></i> สรุปชั่วโมงสอน
@@ -190,6 +204,43 @@
                {/**/}
            </div>
            <p id="substitute-summary-schedule-nodata" class="text-center text-slate-500 text-xl font-medium py-8 hidden"></p>
+        </div>
+		<div id="teacher-detail-schedule-content" class="tab-content space-y-6 bg-white p-1">
+           <h3 class="text-2xl font-bold text-center text-indigo-700 mb-6">
+               ตารางสอนช่วงติว O-NET (10/11/2568 - 30/01/2569)
+           </h3>
+
+           <div class="mb-4 text-center">
+                <label for="teacher-detail-select" class="block text-lg font-medium text-slate-700 mb-2">เลือกชื่อผู้สอน:</label>
+                <select id="teacher-detail-select" class="w-auto max-w-xs p-3 border border-slate-300 rounded-lg text-lg text-center shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="">-- กรุณาเลือกครู --</option>
+                    </select>
+           </div>
+           
+           <h4 id="teacher-detail-total-hours" class="text-xl font-semibold text-center text-blue-800 mb-6" style="display: none;">
+               {/* ชั่วโมงสอนรวมจะแสดงที่นี่ */}
+           </h4>
+
+           <div id="teacher-detail-schedule-table" class="overflow-x-auto">
+               {/* ตารางสอนแบบละเอียดจะแสดงที่นี่ */}
+           </div>
+           <p id="teacher-detail-schedule-nodata" class="text-center text-slate-500 text-xl font-medium py-8 hidden"></p>
+        </div>
+		<div id="student-detail-schedule-content" class="tab-content space-y-6 bg-white p-1">
+           <h3 class="text-2xl font-bold text-center text-indigo-700 mb-6">
+               ตารางเรียนนักเรียนช่วงติว O-NET (10/11/2568 - 30/01/2569)
+           </h3>
+
+           <div class="mb-4 text-center">
+                <label for="student-detail-select" class="block text-lg font-medium text-slate-700 mb-2">เลือกชั้นเรียน:</label>
+                <select id="student-detail-select" class="w-auto max-w-xs p-3 border border-slate-300 rounded-lg text-lg text-center shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="">-- กรุณาเลือกชั้นเรียน --</option>
+                    </select>
+           </div>
+           
+           <div id="student-detail-schedule-table" class="overflow-x-auto">
+               </div>
+           <p id="student-detail-schedule-nodata" class="text-center text-slate-500 text-xl font-medium py-8 hidden"></p>
         </div>
     </div>
     </div>
@@ -1387,6 +1438,35 @@ function parseGradeToNumber(grade) {
                 return gradeNum >= 1 && gradeNum <= 3;
             });
         }
+		
+		function getShortName(fullName) {
+    if (!fullName || typeof fullName !== 'string') return '';
+    // แยกชื่อด้วยช่องว่าง และคืนค่าส่วนแรก
+    return fullName.split(' ')[0]; 
+}
+		
+		function populateTeacherDetailDropdown() {
+            // เรียงชื่อครู A-Z
+            const sortedTeachers = [...allTeacherData].sort((a, b) => a.name.localeCompare(b.name, 'th'));
+
+            sortedTeachers.forEach(teacher => {
+                const option = document.createElement('option');
+                option.value = teacher.name;
+                option.textContent = teacher.name;
+                teacherDetailSelect.appendChild(option);
+            });
+        }
+		
+		function populateStudentDetailDropdown() {
+            const gradesToDisplay = ['ป.1', 'ป.2', 'ป.3', 'ป.4', 'ป.5', 'ม.1', 'ม.2'];
+
+            gradesToDisplay.forEach(grade => {
+                const option = document.createElement('option');
+                option.value = grade;
+                option.textContent = grade;
+                studentDetailSelect.appendChild(option);
+            });
+        }
 
 function generateSchedules(dateKey) {
     const onetDaySchedule = onetData[dateKey]; //
@@ -1703,6 +1783,7 @@ function calculateWorkloadSummary(startDateKey, endDateKey) {
             // 4. Calculate Substitute hours (by running the daily schedule generator)
             // and build lookup for substitute check
             const dailySchedules = generateSchedules(dateKey); //
+			dailyScheduleCache[dateKey] = dailySchedules;
 
             // --- สร้าง Lookup สำหรับตรวจสอบว่าใครสอนแทนคาบไหนในวันนี้ ---
             const subsLookup = {}; // Format: { 1: ["TeacherA"], 2: ["TeacherB", "TeacherC"], ... }
@@ -1803,11 +1884,20 @@ const nextRotationBtn = document.getElementById('next-rotation-btn');
 const rotationStatus = document.getElementById('rotation-status');
 const exportCombinedBtn = document.getElementById('export-combined-btn');
 const shareCombinedBtn = document.getElementById('share-combined-btn');
+const exportAllTeachersZipBtn = document.getElementById('export-all-teachers-zip-btn');
+const exportAllStudentsZipBtn = document.getElementById('export-all-students-zip-btn');
 // ตัวแปรใหม่ที่เราเพิ่ม
 const substituteSummaryScheduleHeaderEl = document.getElementById('substitute-summary-schedule-header');
 const substituteSummaryScheduleDetails = document.getElementById('substitute-summary-schedule-details');
 const substituteSummaryScheduleNoDataEl = document.getElementById('substitute-summary-schedule-nodata');
 // จบตัวแปรใหม่
+const teacherDetailSelect = document.getElementById('teacher-detail-select');
+const teacherDetailTotalHours = document.getElementById('teacher-detail-total-hours');
+const teacherDetailScheduleTable = document.getElementById('teacher-detail-schedule-table');
+const teacherDetailScheduleNodata = document.getElementById('teacher-detail-schedule-nodata');
+const studentDetailSelect = document.getElementById('student-detail-select');
+const studentDetailScheduleTable = document.getElementById('student-detail-schedule-table');
+const studentDetailScheduleNodata = document.getElementById('student-detail-schedule-nodata');
         // Action buttons & Toast
         const exportBtn = document.getElementById('export-btn');
         const shareBtn = document.getElementById('share-btn');
@@ -1816,6 +1906,7 @@ const substituteSummaryScheduleNoDataEl = document.getElementById('substitute-su
         let currentFullSchedule = null; // Store the generated schedule
 		let workloadSummaryData = null; // เพิ่มตัวแปรนี้
 		let onetOverviewTableHTML = null; // Cache for the overview table
+		let dailyScheduleCache = {}; // <-- *** เพิ่ม Cache ใหม่สำหรับเก็บผลลัพธ์รายวัน ***
 
         function showToast(message) {
             toast.textContent = message;
@@ -2132,11 +2223,11 @@ function renderSubstitutionSchedule(scheduleData) {
         substituteSchedule.sort((a, b) => a.period - b.period); // เรียงคาบ
 
         const teacherDiv = document.createElement('div');
-        teacherDiv.className = "bg-blue-50 p-5 rounded-lg shadow-md border border-blue-200";
+        teacherDiv.className = "bg-slate-50 p-5 rounded-lg shadow-md border border-slate-200"; // <-- เปลี่ยนเป็นสีเทา
 
         // --- สร้าง Header พร้อมเหตุผล และ "คาบรวมสุดท้าย" (แก้ไขใหม่) ---
         const teacherHeader = document.createElement('h4');
-        teacherHeader.className = "text-xl font-semibold text-blue-900 mb-3";
+        teacherHeader.className = "text-xl font-semibold text-indigo-900 mb-4"; // <-- เปลี่ยนเป็นสีคราม และ mb-4
 
         // ดึงเหตุผลส่วนแรก (เช่น "ครูว่าง (คาบรวมน้อยสุด)")
         const firstReasonFull = substituteSchedule[0]?.subChoiceReason || '';
@@ -2155,14 +2246,14 @@ function renderSubstitutionSchedule(scheduleData) {
 
 
         const classList = document.createElement('ul');
-        classList.className = "list-none space-y-2";
+        classList.className = "list-disc list-inside space-y-3 pl-2"; // <-- เปลี่ยนเป็นแบบมีจุดนำหน้า
 
-        substituteSchedule.forEach(cls => {
-            const listItem = document.createElement('li');
-            listItem.className = "text-slate-800 text-base md:text-lg border-b border-blue-100 pb-1";
+ substituteSchedule.forEach(cls => {
+    const listItem = document.createElement('li');
+    listItem.className = "text-slate-800 text-base md:text-lg"; // <-- แก้ไข Class (ลบเส้นคั่นออก)
 
-            const timeStr = PERIOD_TIMES[cls.period] || ''; //
-            const originalTeacher = cls.originalTeacher;
+    const timeStr = PERIOD_TIMES[cls.period] || '';
+    const originalTeacher = cls.originalTeacher;
             // --- ตรวจสอบการใช้งาน absenceReasons ตรงนี้ ---
             const absenceReasonFull = absenceReasons[originalTeacher] || '';
 
@@ -2175,14 +2266,14 @@ function renderSubstitutionSchedule(scheduleData) {
                 }
             }
 
-            listItem.innerHTML = `
-                <strong class="text-blue-800 w-16 inline-block">คาบ ${cls.period}:</strong>
-                <span class="mr-1">${cls.subject}</span>
-                <span class="text-slate-600">(${cls.grade})</span>
-                <span class="ml-2">→</span>
-                <strong class="text-orange-600 ml-1">สอนแทน ${originalTeacher}</strong>
-                ${onetDetail}
-            `;
+listItem.innerHTML = `
+         <strong class="text-slate-900">คาบ ${cls.period}:</strong>
+         <span class="mr-1">${cls.subject}</span>
+         <span class="text-slate-600">(${cls.grade})</span>
+         <span class="ml-2">→</span>
+         <strong class="text-green-700 ml-1">สอนแทน ${originalTeacher}</strong>
+         ${onetDetail}
+    `;
             classList.appendChild(listItem);
         });
 
@@ -2190,9 +2281,285 @@ function renderSubstitutionSchedule(scheduleData) {
         substituteSummaryScheduleDetails.appendChild(teacherDiv);
     });
 }
-// *** จบฟังก์ชัน renderSubstitutionSchedule (แก้ไข V3 - แสดงคาบรวมสุดท้าย) ***
 
-// Main function to generate and render both schedules
+function renderTeacherDetailSchedule() {
+    const selectedTeacherName = teacherDetailSelect.value;
+    teacherDetailScheduleTable.innerHTML = '';
+    teacherDetailScheduleNodata.classList.add('hidden');
+    teacherDetailTotalHours.style.display = 'none';
+
+    if (!selectedTeacherName) {
+        teacherDetailScheduleNodata.textContent = 'กรุณาเลือกครูจากรายการ';
+        teacherDetailScheduleNodata.classList.remove('hidden');
+        return;
+    }
+
+    // --- 1. ตรวจสอบ/เรียกใช้ Cache ---
+    if (Object.keys(dailyScheduleCache).length === 0) {
+        if (workloadSummaryData === null) {
+             teacherDetailScheduleNodata.textContent = 'กำลังคำนวณข้อมูล... กรุณาคลิกแท็บ "สรุปชั่วโมงสอน" 1 ครั้งเพื่อโหลดข้อมูล';
+             teacherDetailScheduleNodata.classList.remove('hidden');
+             setTimeout(() => {
+                 workloadSummaryData = calculateWorkloadSummary("10/11/2568", "30/01/2569");
+                 console.log("Cache populated. Please re-select teacher.");
+                 teacherDetailScheduleNodata.textContent = 'ข้อมูลพร้อมแล้ว! กรุณาเลือกครูอีกครั้ง';
+             }, 50);
+             return;
+        }
+    }
+    
+    // --- 2. แสดงชั่วโมงสอนรวม ---
+    if (workloadSummaryData) {
+        const teacherData = workloadSummaryData.find(t => t.name === selectedTeacherName);
+        if (teacherData) {
+            teacherDetailTotalHours.textContent = `ชั่วโมงสอนรวม ${teacherData.total} ชั่วโมง`;
+            teacherDetailTotalHours.style.display = 'block';
+        }
+    }
+
+    // --- 3. สร้างตาราง ---
+    const table = document.createElement('table');
+    table.className = "min-w-full divide-y divide-slate-200 border border-slate-300 shadow-md rounded-lg text-center";
+    
+    // สร้าง Header (เหมือนเดิม)
+    table.innerHTML = `
+        <thead class="bg-slate-100">
+            <tr>
+                <th class="px-2 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">วันที่</th>
+                <th class="px-1 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">วัน</th>
+                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 1 (08:30 น.)</th>
+                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 2 (09:30 น.)</th>
+                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 3 (10:30 น.)</th>
+                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-200">พักเที่ยง</th>
+                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 4 (12:30 น.)</th>
+                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 5 (13:30 น.)</th>
+                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 6 (14:30 น.)</th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-slate-200">
+        </tbody>
+    `;
+    const tbody = table.querySelector('tbody');
+
+    // --- 4. วนลูปข้อมูลรายวันจาก Cache ---
+    let hasData = false;
+    const colorNormal = "bg-green-100 text-green-800 font-medium";
+    const colorSub = "bg-orange-100 text-orange-800 font-medium";
+    const colorOnet = "bg-purple-100 text-purple-800 font-medium";
+    const colorFree = "text-slate-400";
+
+    onetDateKeys.forEach(dateKey => {
+        hasData = true;
+        const dayOfWeek = getDayOfWeek(dateKey).replace('วัน', '');
+        const onetDaySchedule = onetData[dateKey];
+        const dailyData = dailyScheduleCache[dateKey];
+        
+        if (!dailyData) {
+             console.warn(`Missing dailyScheduleCache for ${dateKey}`);
+             return;
+        }
+        
+        const finalAssignments = dailyData.finalPeriodAssignments;
+
+        let rowHTML = `
+            <tr class="hover:bg-slate-50">
+                <td class="px-2 py-2 whitespace-nowrap text-left text-sm">${dateKey}</td>
+                <td class="px-1 py-2 whitespace-nowrap text-sm">${dayOfWeek}</td>
+        `;
+
+        // วนลูป 6 คาบ
+        for (let period = 1; period <= 6; period++) {
+            if (period === 4) { // เพิ่มคอลัมน์พักเที่ยง
+                rowHTML += `<td class="px-2 py-2 whitespace-nowrap text-sm bg-slate-200 text-slate-600">พักเที่ยง</td>`;
+            }
+
+            let cellContent = `<span class="${colorFree}">-</span>`; // ค่าเริ่มต้น: ว่าง
+            let cellClass = "";
+
+            // --- *** LOGIC ใหม่ที่แก้ไข *** ---
+            // 1. ตรวจสอบว่าครูคนนี้ติว O-NET หรือไม่?
+            if (isTeacherTutoring(selectedTeacherName, period, onetDaySchedule)) { //
+                cellContent = "ติว O-NET";
+                cellClass = colorOnet;
+            } else {
+                // 2. ถ้าไม่ติว ให้ค้นหาในตารางสอนสุดท้าย (finalAssignments)
+                let classFound = false;
+                if (finalAssignments && finalAssignments[period]) {
+                    for (const grade in finalAssignments[period]) {
+                        const assignment = finalAssignments[period][grade];
+                        
+                        // 2.1 ตรวจสอบว่าเจอคาบที่ครูคนนี้สอนหรือไม่
+                        if (assignment.teacher === selectedTeacherName) {
+                            classFound = true;
+                            
+                            // 2.2 ตรวจสอบว่าเป็นคาบ "สอนแทน" หรือไม่
+                            if (assignment.teacher !== assignment.originalTeacher) {
+                                cellContent = `${grade} (แทน)`;
+                                cellClass = colorSub;
+                            } else {
+                                // 2.3 ถ้าไม่ใช่ "สอนแทน" แสดงว่าเป็น "สอนปกติ"
+                                // ให้ตรวจสอบว่านักเรียนไปติว O-NET หรือไม่
+                                if (isGradeTutoring(grade, period, onetDaySchedule)) { //
+                                    cellContent = `<span class="${colorFree}">(${grade} ติว)</span>`;
+                                } else {
+                                    cellContent = grade;
+                                    cellClass = colorNormal;
+                                }
+                            }
+                            break; // เจอคาบของครูคนนี้แล้ว หยุดค้นหาในคาบนี้
+                        }
+                    }
+                }
+                // (ถ้าไม่เจอ classFound = false, cellContent จะยังเป็น '-' ตามค่าเริ่มต้น)
+            }
+            // --- *** จบ LOGIC ใหม่ *** ---
+            
+            rowHTML += `<td class="px-2 py-2 whitespace-nowrap text-sm ${cellClass}">${cellContent}</td>`;
+        } // จบ loop 6 คาบ
+
+        rowHTML += `</tr>`;
+        tbody.innerHTML += rowHTML;
+    }); // จบ loop รายวัน
+
+    if (hasData) {
+        teacherDetailScheduleTable.appendChild(table);
+    } else {
+        teacherDetailScheduleNodata.textContent = 'ไม่พบข้อมูลตารางสอนในช่วงวันที่กำหนด';
+        teacherDetailScheduleNodata.classList.remove('hidden');
+    }
+}
+
+function renderStudentDetailSchedule() {
+    const selectedGrade = studentDetailSelect.value;
+    studentDetailScheduleTable.innerHTML = '';
+    studentDetailScheduleNodata.classList.add('hidden');
+
+    if (!selectedGrade) {
+        studentDetailScheduleNodata.textContent = 'กรุณาเลือกชั้นเรียน';
+        studentDetailScheduleNodata.classList.remove('hidden');
+        return;
+    }
+
+    // --- 1. ตรวจสอบ Cache (เหมือนกับตารางสอนครู) ---
+    if (Object.keys(dailyScheduleCache).length === 0) {
+        if (workloadSummaryData === null) {
+             studentDetailScheduleNodata.textContent = 'กำลังคำนวณข้อมูล... กรุณาคลิกแท็บ "สรุปชั่วโมงสอน" 1 ครั้งเพื่อโหลดข้อมูล';
+             studentDetailScheduleNodata.classList.remove('hidden');
+             setTimeout(() => {
+                 workloadSummaryData = calculateWorkloadSummary("10/11/2568", "30/01/2569");
+                 console.log("Cache populated. Please re-select grade.");
+                 studentDetailScheduleNodata.textContent = 'ข้อมูลพร้อมแล้ว! กรุณาเลือกชั้นเรียนอีกครั้ง';
+             }, 50);
+             return;
+        }
+    }
+    
+    // --- 2. สร้างตาราง ---
+    const table = document.createElement('table');
+    table.className = "min-w-full divide-y divide-slate-200 border border-slate-300 shadow-md rounded-lg text-center";
+    
+    // สร้าง Header
+    table.innerHTML = `
+        <thead class="bg-slate-100">
+            <tr>
+                <th class="px-2 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">วันที่</th>
+                <th class="px-1 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">วัน</th>
+                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 1 (08:30 น.)</th>
+                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 2 (09:30 น.)</th>
+                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 3 (10:30 น.)</th>
+                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-200">พักเที่ยง</th>
+                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 4 (12:30 น.)</th>
+                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 5 (13:30 น.)</th>
+                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 6 (14:30 น.)</th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-slate-200">
+        </tbody>
+    `;
+    const tbody = table.querySelector('tbody');
+
+    // --- 3. วนลูปข้อมูลรายวันจาก Cache ---
+    let hasData = false;
+    const colorNormal = "bg-green-100 text-green-800 font-medium";
+    const colorSub = "bg-orange-100 text-orange-800 font-medium";
+    const colorSpecial = "bg-gray-100 text-gray-700";
+    const colorFree = "text-slate-400";
+
+    onetDateKeys.forEach(dateKey => {
+        hasData = true;
+        const dayOfWeek = getDayOfWeek(dateKey).replace('วัน', '');
+        const dailyData = dailyScheduleCache[dateKey];
+        
+        if (!dailyData) {
+             console.warn(`Missing dailyScheduleCache for ${dateKey}`);
+             return; // ข้ามวันนี้
+        }
+        
+        const finalAssignments = dailyData.finalPeriodAssignments;
+
+        let rowHTML = `
+            <tr class="hover:bg-slate-50">
+                <td class="px-2 py-2 whitespace-nowrap text-left text-sm">${dateKey}</td>
+                <td class="px-1 py-2 whitespace-nowrap text-sm">${dayOfWeek}</td>
+        `;
+
+        // วนลูป 6 คาบ
+        for (let period = 1; period <= 6; period++) {
+            if (period === 4) { // เพิ่มคอลัมน์พักเที่ยง
+                rowHTML += `<td class="px-2 py-2 whitespace-nowrap text-sm bg-slate-200 text-slate-600">พักเที่ยง</td>`;
+            }
+
+            let cellContent = `<span class="${colorFree}">-</span>`;
+            let cellClass = "";
+
+            // --- *** LOGIC ใหม่สำหรับตารางเรียน *** ---
+            const assignment = finalAssignments?.[period]?.[selectedGrade];
+
+            if (assignment) {
+                const teacherName = assignment.teacher;
+                const subject = assignment.subject;
+                const isSubstitute = teacherName && (teacherName !== assignment.originalTeacher);
+
+                // 1. จัดการคาบพิเศษ (ลูกเสือ, ชุมนุม, PLC)
+                if (EXCLUDED_SUBJECTS.includes(subject)) {
+                    cellContent = subject; // แสดงชื่อกิจกรรม
+                    cellClass = colorSpecial;
+                }
+                // 2. จัดการคาบแนะแนว
+                else if (subject === 'แนะแนว') {
+                cellContent = getShortName('รองอัจฉรา มาอินทร์'); // <-- แก้ไขจุดที่ 1
+                cellClass = colorNormal;
+            }
+            // 3. จัดการคาบสอนปกติและสอนแทน
+            else if (teacherName) {
+                const shortName = getShortName(teacherName); // <-- เรียกใช้ฟังก์ชัน
+                if (isSubstitute) {
+                    cellContent = `${shortName} (แทน)`; // <-- แก้ไขจุดที่ 2
+                    cellClass = colorSub;
+                } else {
+                    cellContent = shortName; // <-- แก้ไขจุดที่ 3
+                    cellClass = colorNormal;
+                }
+            }
+                // (ถ้าไม่มี teacherName แต่มี assignment จะตกไปที่ค่าเริ่มต้น '-')
+            }
+            // --- *** จบ LOGIC ใหม่ *** ---
+            
+            rowHTML += `<td class="px-2 py-2 whitespace-nowrap text-sm ${cellClass}">${cellContent}</td>`;
+        } // จบ loop 6 คาบ
+
+        rowHTML += `</tr>`;
+        tbody.innerHTML += rowHTML;
+    }); // จบ loop รายวัน
+
+    if (hasData) {
+        studentDetailScheduleTable.appendChild(table);
+    } else {
+        studentDetailScheduleNodata.textContent = 'ไม่พบข้อมูลตารางเรียนในช่วงวันที่กำหนด';
+        studentDetailScheduleNodata.classList.remove('hidden');
+    }
+}
+
         function generateAndRenderAllSchedules() {
             const selectedDateValue = datePicker.value;
             const dateKey = formatDateToKey(selectedDateValue);
@@ -2235,6 +2602,7 @@ function renderSubstitutionSchedule(scheduleData) {
             // 5. ล้าง Cache ข้อมูลเก่าทิ้ง
             workloadSummaryData = null;     //
             onetOverviewTableHTML = null;   //
+			dailyScheduleCache = {};
 
             // 6. สั่ง Render แท็บรายวัน (สอนแทน, นักเรียน) ใหม่
             generateAndRenderAllSchedules();
@@ -2263,7 +2631,12 @@ function renderSubstitutionSchedule(scheduleData) {
 				else if (activeTabId === 'substitute-summary-schedule') { // <-- เพิ่มส่วนนี้
                 // ถ้าแท็บสรุปการสอนแทนกำลังเปิดอยู่ ให้ render ใหม่
                 renderSubstitutionSchedule(currentFullSchedule);
-            }
+                } else if (activeTabId === 'teacher-detail-schedule') { // <-- *** เพิ่มส่วนนี้ ***
+                    // บังคับแสดงผลแท็บตารางสอนรายบุคคล (ซึ่งจะไปเรียก cache check)
+                    renderTeacherDetailSchedule();
+				} else if (activeTabId === 'student-detail-schedule') { // <-- *** เพิ่มส่วนนี้ ***
+                    renderStudentDetailSchedule();
+                }
             }
         }
 
@@ -2306,7 +2679,12 @@ tabButtons.forEach(button => {
              if (currentFullSchedule) { // เช็คว่ามีข้อมูลตารางล่าสุดหรือยัง
                   renderSubstitutionSchedule(currentFullSchedule); // ให้ render ทันที
              }
-             // (ถ้ายังไม่มี currentFullSchedule ไม่ต้องทำอะไร รอ generateAndRenderAllSchedules ทำงาน)
+             } else if (tabId === 'teacher-detail-schedule') { // <-- *** เพิ่มส่วนนี้ ***
+                 // แสดงผลตารางสอนครูที่เลือก
+                 // ฟังก์ชันนี้จะจัดการเรื่อง cache และ total hours เอง
+                 renderTeacherDetailSchedule();
+			} else if (tabId === 'student-detail-schedule') { // <-- *** เพิ่มส่วนนี้ ***
+                 renderStudentDetailSchedule();
         }
     }); // <-- ปิด event listener ของปุ่ม
 }); // <-- ปิด tabButtons.forEach
@@ -2316,6 +2694,8 @@ tabButtons.forEach(button => {
         datePicker.addEventListener('change', generateAndRenderAllSchedules);
 		prevRotationBtn.addEventListener('click', () => applyRotation(currentRotationIndex - 1));
         nextRotationBtn.addEventListener('click', () => applyRotation(currentRotationIndex + 1));
+		teacherDetailSelect.addEventListener('change', renderTeacherDetailSchedule);
+		studentDetailSelect.addEventListener('change', renderStudentDetailSchedule);
 // --- Event Listener สำหรับ Export ภาพรวม (แก้ไข) ---
         exportCombinedBtn.addEventListener('click', async () => {
             const selectedDateValue = datePicker.value;
@@ -2375,25 +2755,25 @@ tabButtons.forEach(button => {
                  tempContainer.lastChild.classList.add('mb-8');
             }
 
-// --- 2. เพิ่มส่วนตารางสอนแทน (ครู) - เพิ่ม Header ย่อย ---
-            const teacherHeaderSub = document.createElement('h3');
-            teacherHeaderSub.className = "text-xl font-semibold text-indigo-800 mb-4"; // ไม่ต้องมี mt-6 เพราะมี hr หรือ mb-8 คั่นอยู่แล้ว
-            teacherHeaderSub.innerHTML = `👩‍🏫 ผลการจัดตารางสอนแทน`;
-            tempContainer.appendChild(teacherHeaderSub);
-            // --- จบการเพิ่ม Header ย่อย ---
+// --- 2. เพิ่มส่วนสรุปการสอนแทน (แก้ไข) ---
+const subSummaryHeader = document.createElement('h3');
+subSummaryHeader.className = "text-xl font-semibold text-indigo-800 mb-4"; // Style เดียวกัน
+subSummaryHeader.innerHTML = `📝 สรุปการสอนแทน`; // ใช้ Emoji และข้อความจากแท็บสรุป
+tempContainer.appendChild(subSummaryHeader);
+// --- จบการเพิ่ม Header ย่อย ---
 
-            // --- 2. เพิ่มส่วนตารางสอนแทน (ครู) - ไม่มี Header แล้ว ---
-            if (currentFullSchedule.teacherSchedule.length > 0) {
-                // Clone เฉพาะส่วน Details
-                const teacherDetailsClone = teacherScheduleDetails.cloneNode(true); //
-                teacherDetailsClone.id = ''; // ลบ ID
-                tempContainer.appendChild(teacherDetailsClone);
-            } else {
-                 const noTeacherData = document.createElement('p');
-                 noTeacherData.className = "text-center text-slate-500 text-xl font-medium py-8 border rounded-lg bg-slate-50 border-slate-200"; // เพิ่ม Style เล็กน้อย
-                 noTeacherData.textContent = "ไม่มีการติว O-NET หรือไม่มีคาบสอนแทนในวันนี้";
-                 tempContainer.appendChild(noTeacherData);
-            }
+// ตรวจสอบว่ามีเนื้อหาใน "สรุปการสอนแทน" หรือไม่
+if (substituteSummaryScheduleDetails.children.length > 0) {
+    // Clone เฉพาะส่วน Details
+    const subSummaryDetailsClone = substituteSummaryScheduleDetails.cloneNode(true); //
+    subSummaryDetailsClone.id = ''; // ลบ ID
+    tempContainer.appendChild(subSummaryDetailsClone);
+} else {
+     const noSubData = document.createElement('p');
+     noSubData.className = "text-center text-slate-500 text-xl font-medium py-8 border rounded-lg bg-blue-50 border-blue-200"; // Style ให้เหมือนกัน
+     noSubData.textContent = "ไม่มีการสอนแทนในวันนี้"; // ใช้ข้อความจากแท็บสรุป
+     tempContainer.appendChild(noSubData);
+}
 
             // --- เพิ่ม Container ชั่วคราวลงใน DOM ---
             document.body.appendChild(tempContainer);
@@ -2473,20 +2853,24 @@ tabButtons.forEach(button => {
             }
 
             // --- เพิ่มหัวข้อย่อยและส่วนตารางสอนแทน (เหมือน Export) ---
-            const teacherHeaderSub = document.createElement('h3');
-            teacherHeaderSub.className = "text-xl font-semibold text-indigo-800 mb-4";
-            teacherHeaderSub.innerHTML = `👩‍🏫 ผลการจัดตารางสอนแทน`;
-            tempContainer.appendChild(teacherHeaderSub);
-            if (currentFullSchedule.teacherSchedule.length > 0) {
-                const teacherDetailsClone = teacherScheduleDetails.cloneNode(true); //
-                teacherDetailsClone.id = '';
-                tempContainer.appendChild(teacherDetailsClone);
-            } else {
-                 const noTeacherData = document.createElement('p');
-                 noTeacherData.className = "text-center text-slate-500 text-xl font-medium py-8 border rounded-lg bg-slate-50 border-slate-200";
-                 noTeacherData.textContent = "ไม่มีการติว O-NET หรือไม่มีคาบสอนแทนในวันนี้";
-                 tempContainer.appendChild(noTeacherData);
-            }
+            const subSummaryHeader = document.createElement('h3');
+subSummaryHeader.className = "text-xl font-semibold text-indigo-800 mb-4";
+subSummaryHeader.innerHTML = `📝 สรุปการสอนแทน`;
+tempContainer.appendChild(subSummaryHeader);
+// --- จบการเพิ่ม Header ย่อย ---
+
+// ตรวจสอบว่ามีเนื้อหาใน "สรุปการสอนแทน" หรือไม่
+if (substituteSummaryScheduleDetails.children.length > 0) {
+    // Clone เฉพาะส่วน Details
+    const subSummaryDetailsClone = substituteSummaryScheduleDetails.cloneNode(true); //
+    subSummaryDetailsClone.id = '';
+    tempContainer.appendChild(subSummaryDetailsClone);
+} else {
+     const noSubData = document.createElement('p');
+     noSubData.className = "text-center text-slate-500 text-xl font-medium py-8 border rounded-lg bg-blue-50 border-blue-200";
+     noSubData.textContent = "ไม่มีการสอนแทนในวันนี้"; //
+     tempContainer.appendChild(noSubData);
+}
 
             // --- เพิ่ม Container ชั่วคราวลงใน DOM ---
             document.body.appendChild(tempContainer);
@@ -2576,7 +2960,15 @@ let exportFileNamePrefix = 'ตาราง';
          exportFileNamePrefix = 'สรุปการสอนแทน';
          noDataCheckElement = substituteSummaryScheduleNoDataEl; // อ้างอิง p id ที่ถูกต้อง
          scheduleCheck = currentFullSchedule; // แท็บนี้ใช้ข้อมูลหลัก
-     }
+     } else if (activeTabContent.id === 'teacher-detail-schedule-content') { // <-- *** เพิ่มส่วนนี้ ***
+                exportFileNamePrefix = `ตารางสอน-${teacherDetailSelect.value || 'ไม่ระบุ'}`;
+                noDataCheckElement = teacherDetailScheduleNodata;
+                scheduleCheck = currentFullSchedule && teacherDetailSelect.value;
+            } else if (activeTabContent.id === 'student-detail-schedule-content') { // <-- *** เพิ่มส่วนนี้ ***
+                exportFileNamePrefix = `ตารางเรียน-${studentDetailSelect.value || 'ไม่ระบุ'}`;
+                noDataCheckElement = studentDetailScheduleNodata;
+                scheduleCheck = currentFullSchedule && studentDetailSelect.value;
+            }
 
             // ตรวจสอบว่าข้อมูลของแท็บนั้นโหลดมาหรือยัง
             if (!scheduleCheck) {
@@ -2634,7 +3026,15 @@ let exportFileNamePrefix = 'ตาราง';
          shareTitlePrefix = 'สรุปการสอนแทน';
          noDataCheckElement = substituteSummaryScheduleNoDataEl; // อ้างอิง p id ที่ถูกต้อง
          scheduleCheck = currentFullSchedule; // แท็บนี้ใช้ข้อมูลหลัก
-     }
+     } else if (activeTabContent.id === 'teacher-detail-schedule-content') { // <-- *** เพิ่มส่วนนี้ ***
+                shareTitlePrefix = `ตารางสอน ${teacherDetailSelect.value || 'ไม่ระบุ'}`;
+                noDataCheckElement = teacherDetailScheduleNodata;
+                scheduleCheck = currentFullSchedule && teacherDetailSelect.value;
+            } else if (activeTabContent.id === 'student-detail-schedule-content') { // <-- *** เพิ่มส่วนนี้ ***
+                shareTitlePrefix = `ตารางเรียน ${studentDetailSelect.value || 'ไม่ระบุ'}`;
+                noDataCheckElement = studentDetailScheduleNodata;
+                scheduleCheck = currentFullSchedule && studentDetailSelect.value;
+            }
 
             // ตรวจสอบว่าข้อมูลของแท็บนั้นโหลดมาหรือยัง
             if (!scheduleCheck) {
@@ -2731,10 +3131,339 @@ let exportFileNamePrefix = 'ตาราง';
             // Format: YYYY-MM-DD
             datePicker.value = `${yyyy}-${mm}-${dd}`;
             // --- จบส่วนที่ 1 ---
-
+			populateTeacherDetailDropdown();
+			populateStudentDetailDropdown();
             // 2. โหลดข้อมูลตามปกติ
             generateAndRenderAllSchedules(); 
         });
+		
+		exportAllTeachersZipBtn.addEventListener('click', async () => {
+            // 1. ตรวจสอบ Cache ข้อมูลก่อน
+            if (Object.keys(dailyScheduleCache).length === 0 || !workloadSummaryData) {
+                showToast('ข้อมูลยังไม่พร้อม! กรุณาคลิกแท็บ "สรุปชั่วโมงสอน" 1 ครั้งก่อน');
+                // ลองเรียกคำนวณเบื้องหลัง
+                if (workloadSummaryData === null) {
+                     setTimeout(() => {
+                        workloadSummaryData = calculateWorkloadSummary("10/11/2568", "30/01/2569");
+                        console.log("Cache populated.");
+                        showToast('ข้อมูลพร้อมแล้ว! กรุณากด Export ZIP อีกครั้ง');
+                     }, 50);
+                }
+                return;
+            }
+
+            showToast('กำลังสร้างไฟล์ ZIP... กรุณารอสักครู่...');
+            
+            try {
+                const zip = new JSZip();
+                // เรียงชื่อครู A-Z
+                const sortedTeachers = [...allTeacherData].sort((a, b) => a.name.localeCompare(b.name, 'th'));
+
+                // ใช้ for...of loop เพื่อให้ await ทำงานถูกต้องทีละคน
+                for (const teacher of sortedTeachers) {
+                    const selectedTeacherName = teacher.name;
+                    console.log(`Exporting: ${selectedTeacherName}`);
+
+                    // --- สร้าง Container ชั่วคราว (Off-screen) สำหรับครูคนนี้ ---
+                    const tempContainer = document.createElement('div');
+                    tempContainer.style.position = 'absolute';
+                    tempContainer.style.left = '-9999px';
+                    tempContainer.style.width = '896px';
+                    tempContainer.style.padding = '32px';
+                    tempContainer.style.backgroundColor = '#ffffff';
+                    tempContainer.className = 'bg-white p-8';
+
+                    // --- 1. สร้าง Header (จาก renderTeacherDetailSchedule) ---
+                    const mainHeader = document.createElement('h3');
+                    mainHeader.className = "text-2xl font-bold text-center text-indigo-700 mb-6";
+                    mainHeader.textContent = `ตารางสอน ${selectedTeacherName}`;
+                    tempContainer.appendChild(mainHeader);
+
+                    // --- 2. สร้างข้อมูลชั่วโมงรวม (จาก renderTeacherDetailSchedule) ---
+                    const teacherData = workloadSummaryData.find(t => t.name === selectedTeacherName);
+                    if (teacherData) {
+                        const totalHoursEl = document.createElement('h4');
+                        totalHoursEl.className = "text-xl font-semibold text-center text-blue-800 mb-6";
+                        totalHoursEl.textContent = `ชั่วโมงสอนรวม ${teacherData.total} ชั่วโมง`;
+                        tempContainer.appendChild(totalHoursEl);
+                    }
+                    
+                    // --- 3. สร้างตาราง (จาก renderTeacherDetailSchedule) ---
+                    const table = document.createElement('table');
+                    table.className = "min-w-full divide-y divide-slate-200 border border-slate-300 shadow-md rounded-lg text-center";
+                    table.innerHTML = `
+                        <thead class="bg-slate-100">
+                            <tr>
+                                <th class="px-2 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">วันที่</th>
+                                <th class="px-1 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">วัน</th>
+                                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 1 (08:30 น.)</th>
+                                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 2 (09:30 น.)</th>
+                                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 3 (10:30 น.)</th>
+                                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-200">พักเที่ยง</th>
+                                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 4 (12:30 น.)</th>
+                                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 5 (13:30 น.)</th>
+                                <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 6 (14:30 น.)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-slate-200">
+                        </tbody>
+                    `;
+                    const tbody = table.querySelector('tbody');
+                    
+                    const colorNormal = "bg-green-100 text-green-800 font-medium";
+                    const colorSub = "bg-orange-100 text-orange-800 font-medium";
+                    const colorOnet = "bg-purple-100 text-purple-800 font-medium";
+                    const colorFree = "text-slate-400";
+
+                    onetDateKeys.forEach(dateKey => {
+                        const dayOfWeek = getDayOfWeek(dateKey).replace('วัน', '');
+                        const onetDaySchedule = onetData[dateKey];
+                        const dailyData = dailyScheduleCache[dateKey];
+                        if (!dailyData) return;
+                        const finalAssignments = dailyData.finalPeriodAssignments;
+                        let rowHTML = `<tr>... (Logic เดียวกับใน renderTeacherDetailSchedule) ...</tr>`;
+                        
+                        // --- คัดลอก Logic การสร้างแถวจาก renderTeacherDetailSchedule ---
+                        rowHTML = `
+                            <tr class="hover:bg-slate-50">
+                                <td class="px-2 py-2 whitespace-nowrap text-left text-sm">${dateKey}</td>
+                                <td class="px-1 py-2 whitespace-nowrap text-sm">${dayOfWeek}</td>
+                        `;
+                        for (let period = 1; period <= 6; period++) {
+                            if (period === 4) {
+                                rowHTML += `<td class="px-2 py-2 whitespace-nowrap text-sm bg-slate-200 text-slate-600">พักเที่ยง</td>`;
+                            }
+                            let cellContent = `<span class="${colorFree}">-</span>`;
+                            let cellClass = "";
+                            if (isTeacherTutoring(selectedTeacherName, period, onetDaySchedule)) {
+                                cellContent = "ติว O-NET";
+                                cellClass = colorOnet;
+                            } else {
+                                let classFound = false;
+                                if (finalAssignments && finalAssignments[period]) {
+                                    for (const grade in finalAssignments[period]) {
+                                        const assignment = finalAssignments[period][grade];
+                                        if (assignment.teacher === selectedTeacherName) {
+                                            classFound = true;
+                                            if (assignment.teacher !== assignment.originalTeacher) {
+                                                cellContent = `${grade} (แทน)`;
+                                                cellClass = colorSub;
+                                            } else {
+                                                if (isGradeTutoring(grade, period, onetDaySchedule)) {
+                                                    cellContent = `<span class="${colorFree}">(${grade} ติว)</span>`;
+                                                } else {
+                                                    cellContent = grade;
+                                                    cellClass = colorNormal;
+                                                }
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            rowHTML += `<td class="px-2 py-2 whitespace-nowrap text-sm ${cellClass}">${cellContent}</td>`;
+                        } // จบ loop 6 คาบ
+                        rowHTML += `</tr>`;
+                        // --- จบการคัดลอก Logic ---
+
+                        tbody.innerHTML += rowHTML;
+                    });
+                    tempContainer.appendChild(table);
+
+                    // --- 4. สร้างภาพ Canvas ---
+                    document.body.appendChild(tempContainer);
+                    await new Promise(resolve => setTimeout(resolve, 50)); // รอ DOM update
+                    
+                    const canvas = await html2canvas(tempContainer, {
+                        scale: 3, // ใช้ scale 3 เพื่อความคมชัด
+                        useCORS: true,
+                        backgroundColor: '#ffffff'
+                    });
+
+                    // --- 5. แปลง Canvas เป็น Blob และเพิ่มลงใน ZIP ---
+                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+                    zip.file(`${selectedTeacherName}.jpg`, blob); // ตั้งชื่อไฟล์ตามชื่อครู
+                    
+                    // --- 6. ลบ Container ชั่วคราว ---
+                    document.body.removeChild(tempContainer);
+
+                } // จบ For loop (ครูคนถัดไป)
+
+                // --- 7. สร้างไฟล์ ZIP และสั่งดาวน์โหลด ---
+                const zipBlob = await zip.generateAsync({ type: "blob" });
+                
+                // สร้าง Link สำหรับดาวน์โหลด
+                const link = document.createElement('a');
+                link.download = `ตารางสอนครูทั้งหมด-${datePicker.value}.zip`;
+                link.href = URL.createObjectURL(zipBlob);
+                link.click();
+                URL.revokeObjectURL(link.href); // คืน memory
+
+                showToast('สร้างไฟล์ ZIP สำเร็จ!');
+
+            } catch (err) {
+                console.error("Error exporting ZIP file:", err);
+                showToast('เกิดข้อผิดพลาดในการสร้างไฟล์ ZIP');
+            }
+        });
+		
+		exportAllStudentsZipBtn.addEventListener('click', async () => {
+        // 1. ตรวจสอบ Cache ข้อมูลก่อน
+        if (Object.keys(dailyScheduleCache).length === 0 || !workloadSummaryData) { //
+            showToast('ข้อมูลยังไม่พร้อม! กรุณาคลิกแท็บ "สรุปชั่วโมงสอน" 1 ครั้งก่อน');
+            // ลองเรียกคำนวณเบื้องหลัง
+            if (workloadSummaryData === null) { //
+                 setTimeout(() => {
+                    workloadSummaryData = calculateWorkloadSummary("10/11/2568", "30/01/2569"); //
+                    console.log("Cache populated.");
+                    showToast('ข้อมูลพร้อมแล้ว! กรุณากด Export ZIP อีกครั้ง');
+                 }, 50);
+            }
+            return;
+        }
+
+        showToast('กำลังสร้างไฟล์ ZIP ตารางเรียน... กรุณารอสักครู่...');
+
+        try {
+            const zip = new JSZip(); //
+            const gradesToExport = ['ป.1', 'ป.2', 'ป.3', 'ป.4', 'ป.5', 'ม.1', 'ม.2']; //
+
+            // --- กำหนดสี (คัดลอกจาก renderTeacherDetailSchedule) ---
+            const colorNormal = "bg-green-100 text-green-800 font-medium";
+            const colorSub = "bg-orange-100 text-orange-800 font-medium";
+            const colorSpecial = "bg-gray-100 text-gray-700";
+            const colorFree = "text-slate-400";
+            // --- จบกำหนดสี ---
+
+            // ใช้ for...of loop เพื่อให้ await ทำงานถูกต้องทีละชั้น
+            for (const grade of gradesToExport) {
+                console.log(`Exporting: ${grade}`);
+
+                // --- สร้าง Container ชั่วคราว (Off-screen) ---
+                const tempContainer = document.createElement('div');
+                tempContainer.style.position = 'absolute';
+                tempContainer.style.left = '-9999px';
+                tempContainer.style.width = '896px';
+                tempContainer.style.padding = '32px';
+                tempContainer.style.backgroundColor = '#ffffff';
+                tempContainer.className = 'bg-white p-8';
+
+                // --- 1. สร้าง Header (จาก renderStudentDetailSchedule) ---
+                const mainHeader = document.createElement('h3');
+                mainHeader.className = "text-2xl font-bold text-center text-indigo-700 mb-6";
+                mainHeader.textContent = `ตารางเรียนนักเรียน ชั้น ${grade} (ช่วงติว O-NET)`;
+                tempContainer.appendChild(mainHeader);
+
+                // --- 2. สร้างตาราง (คัดลอก Logic จาก renderStudentDetailSchedule) ---
+                const table = document.createElement('table');
+                table.className = "min-w-full divide-y divide-slate-200 border border-slate-300 shadow-md rounded-lg text-center";
+                table.innerHTML = `
+                    <thead class="bg-slate-100">
+                        <tr>
+                            <th class="px-2 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">วันที่</th>
+                            <th class="px-1 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">วัน</th>
+                            <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 1 (08:30 น.)</th>
+                            <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 2 (09:30 น.)</th>
+                            <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 3 (10:30 น.)</th>
+                            <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-200">พักเที่ยง</th>
+                            <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 4 (12:30 น.)</th>
+                            <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 5 (13:30 น.)</th>
+                            <th class="px-2 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">คาบ 6 (14:30 น.)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-slate-200">
+                    </tbody>
+                `;
+                const tbody = table.querySelector('tbody');
+
+                onetDateKeys.forEach(dateKey => { //
+                    const dayOfWeek = getDayOfWeek(dateKey).replace('วัน', ''); //
+                    const dailyData = dailyScheduleCache[dateKey]; //
+                    if (!dailyData) return;
+
+                    const finalAssignments = dailyData.finalPeriodAssignments; //
+                    let rowHTML = `
+                        <tr class="hover:bg-slate-50">
+                            <td class="px-2 py-2 whitespace-nowrap text-left text-sm">${dateKey}</td>
+                            <td class="px-1 py-2 whitespace-nowrap text-sm">${dayOfWeek}</td>
+                    `;
+
+                    // --- คัดลอก Logic การสร้างแถวจาก renderStudentDetailSchedule ---
+                    for (let period = 1; period <= 6; period++) {
+                        if (period === 4) {
+                            rowHTML += `<td class="px-2 py-2 whitespace-nowrap text-sm bg-slate-200 text-slate-600">พักเที่ยง</td>`;
+                        }
+                        let cellContent = `<span class="${colorFree}">-</span>`;
+                        let cellClass = "";
+
+                        const assignment = finalAssignments?.[period]?.[grade]; // ใช้ grade ที่กำลัง loop อยู่
+
+                        if (assignment) {
+                            const teacherName = assignment.teacher;
+                            const subject = assignment.subject;
+                            const isSubstitute = teacherName && (teacherName !== assignment.originalTeacher);
+
+                            if (EXCLUDED_SUBJECTS.includes(subject)) { //
+                                cellContent = subject;
+                                cellClass = colorSpecial;
+                            } else if (subject === 'แนะแนว') {
+                                cellContent = getShortName('รองอัจฉรา มาอินทร์'); //
+                                cellClass = colorNormal;
+                            } else if (teacherName) {
+                                const shortName = getShortName(teacherName); //
+                                if (isSubstitute) {
+                                    cellContent = `${shortName} (แทน)`;
+                                    cellClass = colorSub;
+                                } else {
+                                    cellContent = shortName;
+                                    cellClass = colorNormal;
+                                }
+                            }
+                        }
+                        rowHTML += `<td class="px-2 py-2 whitespace-nowrap text-sm ${cellClass}">${cellContent}</td>`;
+                    } // จบ loop 6 คาบ
+                    rowHTML += `</tr>`;
+                    // --- จบการคัดลอก Logic ---
+
+                    tbody.innerHTML += rowHTML;
+                });
+                tempContainer.appendChild(table);
+
+                // --- 4. สร้างภาพ Canvas ---
+                document.body.appendChild(tempContainer);
+                await new Promise(resolve => setTimeout(resolve, 50)); // รอ DOM update
+
+                const canvas = await html2canvas(tempContainer, {
+                    scale: 3, // ใช้ scale 3 เพื่อความคมชัด
+                    useCORS: true,
+                    backgroundColor: '#ffffff'
+                });
+
+                // --- 5. แปลง Canvas เป็น Blob และเพิ่มลงใน ZIP ---
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+                zip.file(`ตารางเรียน ${grade}.jpg`, blob); // ตั้งชื่อไฟล์ตามชั้นเรียน
+
+                // --- 6. ลบ Container ชั่วคราว ---
+                document.body.removeChild(tempContainer);
+
+            } // จบ For loop (ชั้นเรียนถัดไป)
+
+            // --- 7. สร้างไฟล์ ZIP และสั่งดาวน์โหลด ---
+            const zipBlob = await zip.generateAsync({ type: "blob" });
+
+            const link = document.createElement('a');
+            link.download = `ตารางเรียนนักเรียน-${datePicker.value}.zip`;
+            link.href = URL.createObjectURL(zipBlob);
+            link.click();
+            URL.revokeObjectURL(link.href); // คืน memory
+
+            showToast('สร้างไฟล์ ZIP ตารางเรียนสำเร็จ!');
+
+        } catch (err) {
+            console.error("Error exporting student ZIP file:", err);
+            showToast('เกิดข้อผิดพลาดในการสร้างไฟล์ ZIP');
+        }
+    });
 
     </script>
 
